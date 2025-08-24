@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/losaPremoldeada";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+ // 👈 NUEVO
 
 type MeshRow = { id?: string; label?: string; kg_m2?: number };
 
@@ -13,22 +15,23 @@ export default function LosaPremoldeadaPage() {
   });
 
   const meshOpts = useMemo(
-    () => Object.values(meshes ?? {}).map((r, i) => ({
-      key: r?.id ?? `m${i}`,
-      label: r?.label ?? r?.id ?? `Malla ${i + 1}`,
-      kg_m2: r?.kg_m2 ?? 0,
-    })),
+    () =>
+      Object.values(meshes ?? {}).map((r, i) => ({
+        key: r?.id ?? `m${i}`,
+        label: r?.label ?? r?.id ?? `Malla ${i + 1}`,
+        kg_m2: r?.kg_m2 ?? 0,
+      })),
     [meshes]
   );
 
   // Estado
-  const [L, setL] = useState(4.2);     // m
-  const [W, setW] = useState(6.0);     // m
-  const [s, setS] = useState(60);      // cm (separación viguetas)
-  const [apoyo, setApoyo] = useState(7);// cm
+  const [L, setL] = useState(4.2); // m
+  const [W, setW] = useState(6.0); // m
+  const [s, setS] = useState(60); // cm (separación viguetas)
+  const [apoyo, setApoyo] = useState(7); // cm
   const [lBloque, setLBloque] = useState(0.6); // m
   const [capa, setCapa] = useState(5); // cm
-  const [waste, setWaste] = useState(8);// %
+  const [waste, setWaste] = useState(8); // %
 
   const [usaMalla, setUsaMalla] = useState(true);
   const [meshId, setMeshId] = useState(meshOpts[0]?.key ?? "");
@@ -53,6 +56,7 @@ export default function LosaPremoldeadaPage() {
     meshDoubleLayer: meshDouble,
   });
 
+  // Tabla resultado
   const rows: ResultRow[] = [];
   rows.push({ label: "Área", qty: res.area_m2, unit: "m²" });
 
@@ -88,6 +92,65 @@ export default function LosaPremoldeadaPage() {
     });
   }
 
+  // 👇 Ítems para proyecto (solo unidades válidas: "m3" | "kg" | "u")
+  const itemsForProject = useMemo(
+    (): { key?: string; label: string; qty: number; unit: string }[] => {
+      const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+      if (!res) return out;
+
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+
+      // Hormigón capa
+      const vol = res.capa?.volumen_con_desperdicio_m3 ?? res.capa?.volumen_m3;
+      if (typeof vol === "number" && vol > 0) {
+        out.push({
+          key: "hormigon_capa_m3",
+          label: "Hormigón capa de compresión",
+          qty: round2(vol),
+          unit: "m3",
+        });
+      }
+
+      // Malla (si hay)
+      if (res.malla && typeof res.malla.kg === "number" && res.malla.kg > 0) {
+        out.push({
+          key: `malla_${res.malla.id ?? "sima"}`,
+          label: `Malla ${res.malla.id}${meshDouble ? " (2 capas)" : ""}`,
+          qty: round2(res.malla.kg),
+          unit: "kg",
+        });
+      }
+
+      // Viguetas (unidades)
+const vigQty = typeof res?.viguetas?.qty === "number" ? res.viguetas.qty : 0;
+if (vigQty > 0) {
+  out.push({
+    key: "viguetas_premoldeadas",
+    label: `Viguetas premoldeadas ${res.viguetas!.largo_unit_m} m`,
+    qty: vigQty,
+    unit: "u",
+  });
+}
+
+// Bloques (unidades)
+const bloquesQty = typeof res?.bloques?.qty === "number" ? res.bloques.qty : 0;
+if (bloquesQty > 0) {
+  out.push({
+    key: "bloques_huecos_losa",
+    label: "Bloques para losa premoldeada",
+    qty: bloquesQty,
+    unit: "u",
+  });
+}
+
+
+      return out;
+    },
+    [res, meshDouble]
+  );
+
+  const defaultTitle = `Losa premoldeada ${L}×${W} · s=${s} cm · capa=${capa} cm`;
+
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold">Hormigón — Losa premoldeada</h1>
@@ -96,37 +159,83 @@ export default function LosaPremoldeadaPage() {
         {/* Formulario */}
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">Luz L (m)
-              <input type="number" value={L} onChange={(e) => setL(+e.target.value || 0)} className="w-full px-3 py-2" />
+            <label className="text-sm">
+              Luz L (m)
+              <input
+                type="number"
+                value={L}
+                onChange={(e) => setL(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
             </label>
-            <label className="text-sm">Ancho W (m)
-              <input type="number" value={W} onChange={(e) => setW(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm">Separación viguetas (cm)
-              <input type="number" value={s} onChange={(e) => setS(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">Apoyo por extremo (cm)
-              <input type="number" value={apoyo} onChange={(e) => setApoyo(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm">Largo bloque (m)
-              <input type="number" value={lBloque} onChange={(e) => setLBloque(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm">Capa compresión (cm)
-              <input type="number" value={capa} onChange={(e) => setCapa(+e.target.value || 0)} className="w-full px-3 py-2" />
+            <label className="text-sm">
+              Ancho W (m)
+              <input
+                type="number"
+                value={W}
+                onChange={(e) => setW(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
             </label>
 
-            <label className="text-sm col-span-2">Desperdicio (%)
-              <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
+            <label className="text-sm">
+              Separación viguetas (cm)
+              <input
+                type="number"
+                value={s}
+                onChange={(e) => setS(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
+            <label className="text-sm">
+              Apoyo por extremo (cm)
+              <input
+                type="number"
+                value={apoyo}
+                onChange={(e) => setApoyo(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
+
+            <label className="text-sm">
+              Largo bloque (m)
+              <input
+                type="number"
+                value={lBloque}
+                onChange={(e) => setLBloque(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
+
+            <label className="text-sm">
+              Capa compresión (cm)
+              <input
+                type="number"
+                value={capa}
+                onChange={(e) => setCapa(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
+
+            <label className="text-sm col-span-2">
+              Desperdicio (%)
+              <input
+                type="number"
+                value={waste}
+                onChange={(e) => setWaste(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
             </label>
           </div>
 
           {/* Malla en capa */}
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2 inline-flex items-center gap-2">
-              <input type="checkbox" checked={usaMalla} onChange={(e) => setUsaMalla(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={usaMalla}
+                onChange={(e) => setUsaMalla(e.target.checked)}
+              />
               Incluir malla de reparto en la capa
             </label>
 
@@ -134,9 +243,15 @@ export default function LosaPremoldeadaPage() {
               <>
                 <label className="text-sm col-span-2">
                   Malla
-                  <select value={meshId} onChange={(e) => setMeshId(e.target.value)} className="w-full px-3 py-2">
+                  <select
+                    value={meshId}
+                    onChange={(e) => setMeshId(e.target.value)}
+                    className="w-full px-3 py-2"
+                  >
                     {meshOpts.map((m, i) => (
-                      <option key={`${m.key}-${i}`} value={m.key}>{m.label}</option>
+                      <option key={`${m.key}-${i}`} value={m.key}>
+                        {m.label}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -156,6 +271,14 @@ export default function LosaPremoldeadaPage() {
         {/* Resultado */}
         <ResultTable title="Resultado" items={rows} />
       </div>
+
+      {/* 👇 Agregar al proyecto */}
+      <AddToProject
+        kind="losa_premoldeada"
+        defaultTitle={defaultTitle}
+        items={itemsForProject}
+        raw={res}
+      />
     </section>
   );
 }

@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/pilote";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+
 
 type ConcreteRow = { id?: string; label?: string };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
@@ -76,11 +78,11 @@ export default function PilotePage() {
     spiral: { phi_mm: phiS, pitch_cm: pitch, extra_m: extra },
   });
 
-  // Salida
+  // Salida visual (tabla)
   const rows: ResultRow[] = [];
   rows.push({ label: "Diámetro", qty: d, unit: "cm" });
   rows.push({ label: "Largo", qty: L, unit: "m" });
-  rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
+  if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
 
   const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3;
   if (vol != null) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
@@ -110,6 +112,39 @@ export default function PilotePage() {
   if (res?.acero_total_kg != null) {
     rows.push({ label: "Acero total", qty: res.acero_total_kg, unit: "kg" });
   }
+
+  // Materiales para "Agregar al proyecto"
+  const projectItems = (function (): { key?: string; label: string; qty: number; unit: string }[] {
+    const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+
+    const hormigon = typeof vol === "number" ? vol : 0;
+    if (hormigon > 0) {
+      out.push({
+        key: "hormigon_pilote",
+        label: "Hormigón para pilotes",
+        qty: Math.round(hormigon * 100) / 100,
+        unit: "m3",
+      });
+    }
+
+    const aceroTotal =
+      typeof res?.acero_total_kg === "number"
+        ? res.acero_total_kg
+        : (res?.longitudinal?.kg ?? 0) + (res?.espiral?.kg ?? 0);
+
+    if (aceroTotal > 0) {
+      out.push({
+        key: "acero_pilote_total",
+        label: "Acero para pilotes",
+        qty: Math.round(aceroTotal * 100) / 100,
+        unit: "kg",
+      });
+    }
+
+    return out;
+  })();
+
+  const defaultTitle = `Pilote d=${d}cm · L=${L}m`;
 
   return (
     <section className="space-y-6">
@@ -242,8 +277,17 @@ export default function PilotePage() {
           </div>
         </div>
 
-        {/* Resultado */}
-        <ResultTable title="Resultado" items={rows} />
+        {/* Resultado + Agregar al proyecto */}
+        <div className="space-y-4">
+          <ResultTable title="Resultado" items={rows} />
+
+          <AddToProject
+            kind="pilote"
+            defaultTitle={defaultTitle}
+            items={projectItems}
+            raw={res}
+          />
+        </div>
       </div>
     </section>
   );

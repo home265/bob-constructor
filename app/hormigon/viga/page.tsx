@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/viga";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+
 
 type ConcreteRow = { id?: string; label?: string };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
@@ -91,9 +93,13 @@ export default function VigaPage() {
     },
   });
 
-  // Salida
+  // Salida (tabla)
   const rows: ResultRow[] = [];
-  rows.push({ label: "Sección", qty: res?.dimensiones ? `${res.dimensiones.b_cm}×${res.dimensiones.h_cm}` as any : "", unit: "cm", });
+  rows.push({
+    label: "Sección",
+    qty: res?.dimensiones ? `${res.dimensiones.b_cm}×${res.dimensiones.h_cm}` as any : "",
+    unit: "cm",
+  });
   if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
   if (res?.dimensiones?.L_m != null) rows.push({ label: "Largo", qty: res.dimensiones.L_m, unit: "m" });
 
@@ -129,6 +135,32 @@ export default function VigaPage() {
     });
     rows.push({ label: `Peso estribos Φ${St.phi_mm}`, qty: St.kg, unit: "kg" });
   }
+
+  // Ítems para proyecto (materiales unificables)
+  const itemsForProject: { key?: string; label: string; qty: number; unit: string }[] = [];
+  const volProj = Number(vol) || 0;
+  if (volProj > 0) {
+    itemsForProject.push({
+      key: "hormigon_simple",
+      label: "Hormigón",
+      qty: volProj,
+      unit: "m3",
+    });
+  }
+  // Acero: uso total si existe; si no, sumo partes
+  const kgLong = Number(res?.longitudinal?.kg) || 0;
+  const kgSt   = Number(res?.estribos?.kg) || 0;
+  const kgTotal = Number(res?.acero_total_kg ?? (kgLong + kgSt)) || 0;
+  if (kgTotal > 0) {
+    itemsForProject.push({
+      key: "acero_corrugado",
+      label: "Acero corrugado",
+      qty: kgTotal,
+      unit: "kg",
+    });
+  }
+
+  const defaultTitle = `Viga ${b}×${h} · L=${L} m`;
 
   return (
     <section className="space-y-6">
@@ -292,6 +324,19 @@ export default function VigaPage() {
         {/* Resultado */}
         <ResultTable title="Resultado" items={rows} />
       </div>
+
+      {/* Agregar al proyecto */}
+      <AddToProject
+        kind="viga"
+        defaultTitle={defaultTitle}
+        items={itemsForProject}
+        raw={{ input: {
+          L_m: L, b_cm: b, h_cm: h, cover_cm: cover, concreteClassId: concreteId,
+          wastePct: waste,
+          long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
+          stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
+        }, result: res }}
+      />
     </section>
   );
 }

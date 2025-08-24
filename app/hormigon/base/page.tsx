@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/base";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+// 👈 NUEVO
 
 type ConcreteRow = { id?: string; label?: string };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
@@ -113,7 +115,7 @@ export default function BasePage() {
     rebarTable: rebarMap,
   });
 
-  // Filas de salida (con chequeos opcionales para evitar que TS se queje)
+  // Filas de salida (para la tabla)
   const rows: ResultRow[] = [];
   if (res?.area_m2 != null) rows.push({ label: "Área", qty: res.area_m2, unit: "m²" });
   if (res?.espesor_cm != null) rows.push({ label: "Espesor", qty: res.espesor_cm, unit: "cm" });
@@ -160,6 +162,44 @@ export default function BasePage() {
       if (y.kg != null) rows.push({ label: `Peso Y Φ${y.phi_mm}`, qty: y.kg, unit: "kg" });
     }
   }
+
+  // 👇 Ítems para el proyecto (solo materiales cuantificables con unidades válidas)
+  const itemsForProject = useMemo(() => {
+    const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+    if (!res) return out;
+
+    const vol = res.volumen_con_desperdicio_m3 ?? res.volumen_m3;
+    if (typeof vol === "number" && vol > 0) {
+      out.push({
+        key: "hormigon_m3",
+        label: `Hormigón ${concreteId}`,
+        qty: Math.round(vol * 100) / 100,
+        unit: "m3",
+      });
+    }
+
+    if (res.modo === "malla" && typeof res.malla_kg === "number") {
+      out.push({
+        key: `malla_${res.malla_id}_kg`,
+        label: `Malla ${res.malla_id}`,
+        qty: Math.round(res.malla_kg * 100) / 100,
+        unit: "kg",
+      });
+    }
+
+    if (res.modo === "barras" && typeof res.barras?.acero_kg === "number") {
+      out.push({
+        key: "acero_barras_kg",
+        label: "Acero en barras",
+        qty: Math.round(res.barras.acero_kg * 100) / 100,
+        unit: "kg",
+      });
+    }
+
+    return out;
+  }, [res, concreteId]);
+
+  const defaultTitle = `Base ${L}×${B} e=${Hcm}cm`;
 
   return (
     <section className="space-y-6">
@@ -337,6 +377,14 @@ export default function BasePage() {
         {/* Resultado */}
         <ResultTable title="Resultado" items={rows} />
       </div>
+
+      {/* 👇 Agregar al proyecto */}
+      <AddToProject
+        kind="base"
+        defaultTitle={defaultTitle}
+        items={itemsForProject}
+        raw={res}
+      />
     </section>
   );
 }

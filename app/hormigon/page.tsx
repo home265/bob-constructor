@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HormigonIndex() {
   const cards = [
     { href: "/hormigon/base", title: "Base/Plateas" },
@@ -7,15 +9,21 @@ export default function HormigonIndex() {
     { href: "/hormigon/losa", title: "Losa maciza" },
     { href: "/hormigon/losa-premoldeada", title: "Losa premoldeada" },
   ];
+
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold">Hormigón armado</h1>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cards.map(c => (
-          <a key={c.href} href={c.href} className="card p-4 hover:bg-[var(--muted)] transition">
+        {cards.map((c) => (
+          <Link
+            key={c.href}
+            href={c.href}
+            className="card p-4 hover:bg-[var(--muted)] transition"
+            aria-label={`Abrir ${c.title}`}
+          >
             <div className="text-lg font-medium">{c.title}</div>
             <div className="text-sm text-foreground/70">Abrir</div>
-          </a>
+          </Link>
         ))}
       </div>
     </section>

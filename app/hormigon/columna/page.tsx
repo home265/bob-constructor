@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/columna";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+ // 👈 NUEVO
 
 type ConcreteRow = { id?: string; label?: string };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
@@ -76,18 +78,11 @@ export default function ColumnaPage() {
     concreteClassId: concreteId,
     wastePct: waste,
     rebarTable: rebarMap,
-    vertical: {
-      phi_mm: phiV,
-      n: nV,
-    },
-    stirrups: {
-      phi_mm: phiS,
-      spacing_cm: s,
-      hook_cm: hook,
-    },
+    vertical: { phi_mm: phiV, n: nV },
+    stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
   });
 
-  // Salida
+  // Salida a tabla
   const rows: ResultRow[] = [];
   rows.push({ label: "Sección", qty: `${b}×${h}`, unit: "cm" as any });
   if (res?.dimensiones?.H_m != null) rows.push({ label: "Altura", qty: res.dimensiones.H_m, unit: "m" });
@@ -125,6 +120,35 @@ export default function ColumnaPage() {
     });
     rows.push({ label: `Peso estribos Φ${St.phi_mm}`, qty: St.kg, unit: "kg" });
   }
+
+  // 👇 Ítems de proyecto (solo unidades válidas del Project: "m3", "kg")
+  const itemsForProject = useMemo(() => {
+    const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+    if (!res) return out;
+
+    const vol = res.volumen_con_desperdicio_m3 ?? res.volumen_m3;
+    if (typeof vol === "number" && vol > 0) {
+      out.push({
+        key: "hormigon_m3",
+        label: `Hormigón ${concreteId}`,
+        qty: Math.round(vol * 100) / 100,
+        unit: "m3",
+      });
+    }
+
+    if (typeof res.acero_total_kg === "number" && res.acero_total_kg > 0) {
+      out.push({
+        key: "acero_total_kg",
+        label: "Acero total",
+        qty: Math.round(res.acero_total_kg * 100) / 100,
+        unit: "kg",
+      });
+    }
+
+    return out;
+  }, [res, concreteId]);
+
+  const defaultTitle = `Columna ${b}×${h} · H=${H} m`;
 
   return (
     <section className="space-y-6">
@@ -270,6 +294,14 @@ export default function ColumnaPage() {
         {/* Resultado */}
         <ResultTable title="Resultado" items={rows} />
       </div>
+
+      {/* 👇 Agregar al proyecto */}
+      <AddToProject
+        kind="columna"
+        defaultTitle={defaultTitle}
+        items={itemsForProject}
+        raw={res}
+      />
     </section>
   );
 }

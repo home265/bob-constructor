@@ -10,6 +10,10 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Carpeta", href: "/carpeta" },
   { label: "Revoque", href: "/revoque" },
   { label: "Revestimientos", href: "/revestimientos" },
+
+  // 👇 nuevo
+  { label: "Boceto estructural", href: "/estructura" },
+
   {
     label: "Hormigón",
     children: [

@@ -4,6 +4,8 @@ import { useJson } from "@/lib/data/useJson";
 // @ts-ignore – desacoplado de la firma exacta
 import * as C from "@/lib/calc/revoque";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+
 
 type RevoqueOptionsFile = {
   lados?: { id?: string; label?: string }[];
@@ -64,13 +66,13 @@ export default function RevoquePage() {
     [opts.terminaciones_ids]
   );
 
-  // Estado + autocorrección segura si cambian las opciones
+  // Estado + autocorrección
   const [lado, setLado] = useState<LadoKey>(
     (ladosOpts[0]?.key as LadoKey) ?? "uno"
   );
   const [term1, setTerm1] = useState<string>(terminaciones[0]?.key ?? "");
   const [term2, setTerm2] = useState<string>(terminaciones[1]?.key ?? "");
-  const [L, setL] = useState(4); // m
+  const [L, setL] = useState(4);   // m
   const [H, setH] = useState(2.7); // m
   const [e, setE] = useState(2.5); // cm
   const [waste, setWaste] = useState(10); // %
@@ -95,7 +97,7 @@ export default function RevoquePage() {
     }
   }, [terminaciones, lado]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Función de cálculo (anotada como any para evitar choques de tipos si la lib aún no acepta "ambos")
+  // Cálculo
   const calc: any =
     // @ts-ignore
     C.calcRevoque ?? C.default ?? ((x: any) => x);
@@ -110,135 +112,157 @@ export default function RevoquePage() {
     wastePct: waste,
   });
 
+  // Filas para la tabla (solo visual)
+  const rows: ResultRow[] = (function () {
+    const out: ResultRow[] = [];
+    if (res?.area_m2 != null)
+      out.push({ label: "Área", qty: res.area_m2, unit: "m²" });
+    if (res?.espesor_cm != null)
+      out.push({ label: "Espesor", qty: res.espesor_cm, unit: "cm" });
+
+    const vol = res?.mortero_con_desperdicio_m3 ?? res?.mortero_m3;
+    if (vol != null)
+      out.push({
+        label: "Mortero",
+        qty: vol,
+        unit: "m³",
+        hint: "Con desperdicio",
+      });
+
+    if (Array.isArray(res?.terminaciones) && res.terminaciones.length) {
+      out.push({
+        label: "Terminaciones",
+        qty: res.terminaciones.join(" + "),
+      });
+    }
+    return out;
+  })();
+
+  // Ítems para Proyecto: SOLO materiales cuantificables.
+  // (No incluimos área/espesor/terminaciones)
+  const itemsForProject = (() => {
+    const list: { label: string; qty: number; unit: string }[] = [];
+    const mort = res?.mortero_con_desperdicio_m3 ?? res?.mortero_m3;
+    if (typeof mort === "number" && mort > 0) {
+      list.push({ label: "Mortero de revoque", qty: mort, unit: "m³" });
+    }
+    return list;
+  })();
+
+  const defaultTitle =
+    `Revoque ${L}×${H} m` + (lado === "ambos" ? " (ambos lados)" : " (un lado)");
+
   return (
-  <section className="space-y-6">
-    <h1 className="text-2xl font-semibold">Revoque</h1>
+    <section className="space-y-6">
+      <h1 className="text-2xl font-semibold">Revoque</h1>
 
-    <div className="grid md:grid-cols-2 gap-4">
-      <div className="card p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm col-span-2">
-            Lados a revocar
-            <select
-              value={lado}
-              onChange={(e) => setLado(e.target.value as LadoKey)}
-              className="w-full px-3 py-2"
-            >
-              {ladosOpts.map((l, i) => (
-                <option key={`${l.key}-${i}`} value={l.key}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="text-sm col-span-2">
-            Terminación lado 1
-            <select
-              value={term1}
-              onChange={(e) => setTerm1(e.target.value)}
-              className="w-full px-3 py-2"
-            >
-              {terminaciones.map((t, i) => (
-                <option key={`${t.key}-${i}`} value={t.key}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {lado === "ambos" && (
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Card: Formulario */}
+        <div className="card p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Terminación lado 2
+              Lados a revocar
               <select
-                value={term2}
-                onChange={(e) => setTerm2(e.target.value)}
+                value={lado}
+                onChange={(e) => setLado(e.target.value as LadoKey)}
+                className="w-full px-3 py-2"
+              >
+                {ladosOpts.map((l, i) => (
+                  <option key={`${l.key}-${i}`} value={l.key}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm col-span-2">
+              Terminación lado 1
+              <select
+                value={term1}
+                onChange={(e) => setTerm1(e.target.value)}
                 className="w-full px-3 py-2"
               >
                 {terminaciones.map((t, i) => (
-                  <option key={`t2-${t.key}-${i}`} value={t.key}>
+                  <option key={`${t.key}-${i}`} value={t.key}>
                     {t.label}
                   </option>
                 ))}
               </select>
             </label>
-          )}
 
-          <label className="text-sm">
-            Longitud (m)
-            <input
-              type="number"
-              value={L}
-              onChange={(e) => setL(+e.target.value || 0)}
-              className="w-full px-3 py-2"
-            />
-          </label>
+            {lado === "ambos" && (
+              <label className="text-sm col-span-2">
+                Terminación lado 2
+                <select
+                  value={term2}
+                  onChange={(e) => setTerm2(e.target.value)}
+                  className="w-full px-3 py-2"
+                >
+                  {terminaciones.map((t, i) => (
+                    <option key={`t2-${t.key}-${i}`} value={t.key}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
-          <label className="text-sm">
-            Altura (m)
-            <input
-              type="number"
-              value={H}
-              onChange={(e) => setH(+e.target.value || 0)}
-              className="w-full px-3 py-2"
-            />
-          </label>
+            <label className="text-sm">
+              Longitud (m)
+              <input
+                type="number"
+                value={L}
+                onChange={(e) => setL(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
 
-          <label className="text-sm col-span-2">
-            Espesor (cm)
-            <input
-              type="number"
-              value={e}
-              onChange={(e2) => setE(+e2.target.value || 0)}
-              className="w-full px-3 py-2"
-            />
-          </label>
+            <label className="text-sm">
+              Altura (m)
+              <input
+                type="number"
+                value={H}
+                onChange={(e) => setH(+e.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
 
-          <label className="text-sm col-span-2">
-            Desperdicio (%)
-            <input
-              type="number"
-              value={waste}
-              onChange={(e2) => setWaste(+e2.target.value || 0)}
-              className="w-full px-3 py-2"
-            />
-          </label>
+            <label className="text-sm col-span-2">
+              Espesor (cm)
+              <input
+                type="number"
+                value={e}
+                onChange={(e2) => setE(+e2.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
+
+            <label className="text-sm col-span-2">
+              Desperdicio (%)
+              <input
+                type="number"
+                value={waste}
+                onChange={(e2) => setWaste(+e2.target.value || 0)}
+                className="w-full px-3 py-2"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Card: Resultado + Agregar al proyecto */}
+        <div className="space-y-4">
+          <div className="card p-4 card--table">
+            <ResultTable title="Resultado" items={rows} />
+          </div>
+
+          <AddToProject
+            kind="revoque"
+            defaultTitle={defaultTitle}
+            items={itemsForProject}
+            raw={res}
+          />
         </div>
       </div>
-
-      <div className="card p-4 card--table">
-        <ResultTable
-          title="Resultado"
-          items={(function () {
-            const out: ResultRow[] = [];
-            if (res?.area_m2 != null)
-              out.push({ label: "Área", qty: res.area_m2, unit: "m²" });
-            if (res?.espesor_cm != null)
-              out.push({ label: "Espesor", qty: res.espesor_cm, unit: "cm" });
-
-            const vol =
-              res?.mortero_con_desperdicio_m3 ?? res?.mortero_m3;
-            if (vol != null)
-              out.push({
-                label: "Mortero",
-                qty: vol,
-                unit: "m³",
-                hint: "Con desperdicio",
-              });
-
-            if (Array.isArray(res?.terminaciones) && res.terminaciones.length) {
-              out.push({
-                label: "Terminaciones",
-                qty: res.terminaciones.join(" + "),
-              });
-            }
-            return out;
-          })()}
-        />
-      </div>
-    </div>
-  </section>
-);
-
-
+    </section>
+  );
 }

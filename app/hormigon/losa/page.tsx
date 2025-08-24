@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/losa";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
+ // 👈 NUEVO
 
 type ConcreteRow = { id?: string; label?: string };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
@@ -25,10 +27,11 @@ export default function LosaPage() {
   });
 
   const concreteOpts = useMemo(
-    () => Object.values(concrete ?? {}).map((r, i) => ({
-      key: r?.id ?? `c${i}`,
-      label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
-    })),
+    () =>
+      Object.values(concrete ?? {}).map((r, i) => ({
+        key: r?.id ?? `c${i}`,
+        label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
+      })),
     [concrete]
   );
 
@@ -44,20 +47,21 @@ export default function LosaPage() {
   }, [rebars]);
 
   const meshOpts = useMemo(
-    () => Object.values(meshes ?? {}).map((r, i) => ({
-      key: r?.id ?? `m${i}`,
-      label: r?.label ?? r?.id ?? `Malla ${i + 1}`,
-      kg_m2: r?.kg_m2 ?? 0,
-    })),
+    () =>
+      Object.values(meshes ?? {}).map((r, i) => ({
+        key: r?.id ?? `m${i}`,
+        label: r?.label ?? r?.id ?? `Malla ${i + 1}`,
+        kg_m2: r?.kg_m2 ?? 0,
+      })),
     [meshes]
   );
 
   // Estado
   const [concreteId, setConcreteId] = useState(concreteOpts[0]?.key ?? "H25");
-  const [Lx, setLx] = useState(4);      // m
-  const [Ly, setLy] = useState(3);      // m
-  const [H, setH] = useState(12);       // cm
-  const [cover, setCover] = useState(3);// cm
+  const [Lx, setLx] = useState(4); // m
+  const [Ly, setLy] = useState(3); // m
+  const [H, setH] = useState(12); // cm
+  const [cover, setCover] = useState(3); // cm
   const [waste, setWaste] = useState(8); // %
 
   const [useMesh, setUseMesh] = useState(true);
@@ -104,6 +108,7 @@ export default function LosaPage() {
     rebarTable: rebarMap,
   });
 
+  // Tabla de resultado (sin cambios)
   const rows: ResultRow[] = [];
   rows.push({ label: "Área", qty: res?.area_m2 ?? 0, unit: "m²" });
   rows.push({ label: "Espesor", qty: res?.espesor_cm ?? 0, unit: "cm" });
@@ -121,7 +126,12 @@ export default function LosaPage() {
   if (res?.modo === "barras" && res?.barras) {
     const b = res.barras;
     if (b.acero_kg != null)
-      rows.push({ label: "Acero total", qty: b.acero_kg, unit: "kg", hint: b.capas === 2 ? "2 capas" : "1 capa" });
+      rows.push({
+        label: "Acero total",
+        qty: b.acero_kg,
+        unit: "kg",
+        hint: b.capas === 2 ? "2 capas" : "1 capa",
+      });
     if (b.x) {
       rows.push({
         label: `Barras X Φ${b.x.phi_mm}`,
@@ -142,6 +152,47 @@ export default function LosaPage() {
     }
   }
 
+  // 👇 Ítems para "Agregar al proyecto": solo m3 y kg (compatibles con Unit)
+  const itemsForProject = useMemo(
+    (): { key?: string; label: string; qty: number; unit: string }[] => {
+      const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+      if (!res) return out;
+
+      const vol = res.volumen_con_desperdicio_m3 ?? res.volumen_m3;
+      if (typeof vol === "number" && vol > 0) {
+        out.push({
+          key: "hormigon_m3",
+          label: `Hormigón ${concreteId}`,
+          qty: Math.round(vol * 100) / 100,
+          unit: "m3",
+        });
+      }
+
+      if (res.modo === "malla" && typeof res.malla_kg === "number" && res.malla_kg > 0) {
+        out.push({
+          key: `malla_${res.malla_id ?? "sima"}`,
+          label: `Malla ${res.malla_id}${meshDoubleLayer ? " (2 capas)" : ""}`,
+          qty: Math.round(res.malla_kg * 100) / 100,
+          unit: "kg",
+        });
+      }
+
+      if (res.modo === "barras" && res.barras && typeof res.barras.acero_kg === "number" && res.barras.acero_kg > 0) {
+        out.push({
+          key: "acero_total_kg",
+          label: "Acero total",
+          qty: Math.round(res.barras.acero_kg * 100) / 100,
+          unit: "kg",
+        });
+      }
+
+      return out;
+    },
+    [res, concreteId, meshDoubleLayer]
+  );
+
+  const defaultTitle = `Losa ${Lx}×${Ly} · e=${H} cm`;
+
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold">Hormigón — Losa (in situ)</h1>
@@ -154,27 +205,34 @@ export default function LosaPage() {
               Clase de hormigón
               <select value={concreteId} onChange={(e) => setConcreteId(e.target.value)} className="w-full px-3 py-2">
                 {concreteOpts.map((c, i) => (
-                  <option key={`${c.key}-${i}`} value={c.key}>{c.label}</option>
+                  <option key={`${c.key}-${i}`} value={c.key}>
+                    {c.label}
+                  </option>
                 ))}
               </select>
             </label>
 
-            <label className="text-sm">Lx (m)
+            <label className="text-sm">
+              Lx (m)
               <input type="number" value={Lx} onChange={(e) => setLx(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-            <label className="text-sm">Ly (m)
+            <label className="text-sm">
+              Ly (m)
               <input type="number" value={Ly} onChange={(e) => setLy(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
-            <label className="text-sm">Espesor (cm)
+            <label className="text-sm">
+              Espesor (cm)
               <input type="number" value={H} onChange={(e) => setH(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
-            <label className="text-sm">Recubrimiento (cm)
+            <label className="text-sm">
+              Recubrimiento (cm)
               <input type="number" value={cover} onChange={(e) => setCover(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
-            <label className="text-sm col-span-2">Desperdicio (%)
+            <label className="text-sm col-span-2">
+              Desperdicio (%)
               <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
           </div>
@@ -193,7 +251,9 @@ export default function LosaPage() {
                 Malla SIMA
                 <select value={meshId} onChange={(e) => setMeshId(e.target.value)} className="w-full px-3 py-2">
                   {meshOpts.map((m, i) => (
-                    <option key={`${m.key}-${i}`} value={m.key}>{m.label}</option>
+                    <option key={`${m.key}-${i}`} value={m.key}>
+                      {m.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -204,21 +264,33 @@ export default function LosaPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">Φ barras X (mm)
+              <label className="text-sm">
+                Φ barras X (mm)
                 <select value={phiX} onChange={(e) => setPhiX(+e.target.value)} className="w-full px-3 py-2">
-                  {rebarOpts.map((r, i) => (<option key={`rx-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>))}
+                  {rebarOpts.map((r, i) => (
+                    <option key={`rx-${r.key}-${i}`} value={r.phi_mm}>
+                      {r.label}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="text-sm">Separación X (cm)
+              <label className="text-sm">
+                Separación X (cm)
                 <input type="number" value={sX} onChange={(e) => setSX(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
 
-              <label className="text-sm">Φ barras Y (mm)
+              <label className="text-sm">
+                Φ barras Y (mm)
                 <select value={phiY} onChange={(e) => setPhiY(+e.target.value)} className="w-full px-3 py-2">
-                  {rebarOpts.map((r, i) => (<option key={`ry-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>))}
+                  {rebarOpts.map((r, i) => (
+                    <option key={`ry-${r.key}-${i}`} value={r.phi_mm}>
+                      {r.label}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="text-sm">Separación Y (cm)
+              <label className="text-sm">
+                Separación Y (cm)
                 <input type="number" value={sY} onChange={(e) => setSY(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
 
@@ -233,6 +305,14 @@ export default function LosaPage() {
         {/* Resultado */}
         <ResultTable title="Resultado" items={rows} />
       </div>
+
+      {/* 👇 Agregar al proyecto */}
+      <AddToProject
+        kind="losa"
+        defaultTitle={defaultTitle}
+        items={itemsForProject}
+        raw={res}
+      />
     </section>
   );
 }

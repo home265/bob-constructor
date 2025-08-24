@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 import OpeningsGroup from "@/components/inputs/OpeningsGroup";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
+import AddToProject from "@/components/ui/AddToProject";
 
 import {
   loadDefaults,
@@ -78,7 +79,6 @@ export default function PageMuros() {
       setCoeffs(c);
       setMortars(m);
       setDefaults(d);
-      // defaults: set mortero asiento al primero disponible
       if (o.morteros_asiento_ids?.length)
         setValue("morteroAsientoId", o.morteros_asiento_ids[0] as any);
       if (o.juntas_mm?.length) setValue("juntaMm", o.juntas_mm[0] as any);
@@ -92,7 +92,7 @@ export default function PageMuros() {
     setRes(r);
   };
 
-  // ---- Mapear resultado → filas del ResultTable
+  // Etiquetas y unidades para mapear res → filas
   const LABELS: Record<string, { label: string; unit?: string }> = {
     area_m2: { label: "Área de muro", unit: "m²" },
     S_m2: { label: "Área de muro", unit: "m²" }, // alias
@@ -106,191 +106,239 @@ export default function PageMuros() {
     revoque_m3: { label: "Revoque", unit: "m³" },
   };
 
+  // Filas para la tabla (ResultTable) — sin 'key', qty SIEMPRE number
   const items: ResultRow[] = useMemo(() => {
     const arr: ResultRow[] = [];
-    if (!res || typeof res !== "object") return arr;
+    if (!res) return arr;
     for (const [k, v] of Object.entries(res as Record<string, unknown>)) {
       const meta = LABELS[k];
       if (!meta) continue;
-      if (v == null) continue;
-      const qty =
-        typeof v === "number" ? Math.round((v as number) * 100) / 100 : String(v);
+      if (typeof v !== "number" || !Number.isFinite(v)) continue;
+      const qty = Math.round(v * 100) / 100;
       arr.push({ label: meta.label, qty, unit: meta.unit });
     }
     return arr;
   }, [res]);
 
+  // Sólo materiales reales para guardar en Proyecto
+  const MATERIAL_KEYS = new Set([
+    "ladrillos_u",
+    "unidades",
+    "mortero_m3",
+    "cemento_bolsas",
+    "cal_bolsas",
+    "arena_m3",
+    "revoque_m3",
+  ]);
+
+  const itemsForProject = useMemo(
+    () => {
+      if (!res) return [] as { key?: string; label: string; qty: number; unit: string }[];
+      const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+      for (const [k, v] of Object.entries(res as Record<string, unknown>)) {
+        if (!MATERIAL_KEYS.has(k)) continue;
+        if (typeof v !== "number" || !Number.isFinite(v)) continue;
+        const meta = LABELS[k];
+        out.push({
+          key: k,
+          label: meta?.label ?? k,
+          qty: Math.round(v * 100) / 100,
+          unit: (meta?.unit ?? "u") as string,
+        });
+      }
+      return out;
+    },
+    [res]
+  );
+
+  // Título por defecto de la partida
+  const defaultTitle = useMemo(() => {
+    const L = watch("L") ?? 0;
+    const H = watch("H") ?? 0;
+    const j = watch("juntaMm") ?? 10;
+    return `Muro ${L}×${H} m · junta ${j} mm`;
+  }, [watch("L"), watch("H"), watch("juntaMm")]);
+
   if (!opts) return <p>Cargando catálogos…</p>;
 
- return (
-  <section className="space-y-6">
-    <h1 className="text-xl font-semibold">Muros</h1>
+  return (
+    <section className="space-y-6">
+      <h1 className="text-xl font-semibold">Muros</h1>
 
-    <div className="grid md:grid-cols-2 gap-4">
-      {/* Card: Formulario */}
-      <div className="card p-4">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Selecciones */}
-          <div className="grid md:grid-cols-3 gap-4">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Tipo de muro</span>
-              <select className="rounded border px-3 py-2" {...register("tipoMuroId")}>
-                {opts.tipo_muro.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Card: Formulario */}
+        <div className="card p-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Selecciones */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Tipo de muro</span>
+                <select className="rounded border px-3 py-2" {...register("tipoMuroId")}>
+                  {opts.tipo_muro.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Ladrillo / Bloque</span>
-              <select className="rounded border px-3 py-2" {...register("ladrilloId")}>
-                <optgroup label="Comunes">
-                  {opts.ladrillos_bloques
-                    .filter((l) => l.familia === "comun")
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.label}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Huecos">
-                  {opts.ladrillos_bloques
-                    .filter((l) => l.familia === "hueco")
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.label}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Bloques cerámicos portantes">
-                  {opts.ladrillos_bloques
-                    .filter((l) => l.familia === "ceramico_portante")
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.id === "bloque_cer_27x19x20"
-                          ? "Bloque cerámico portante 27×19×20"
-                          : l.label}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Bloques de cemento portantes">
-                  {opts.ladrillos_bloques
-                    .filter((l) => l.familia === "hormigon")
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.label}
-                      </option>
-                    ))}
-                </optgroup>
-              </select>
-            </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Ladrillo / Bloque</span>
+                <select className="rounded border px-3 py-2" {...register("ladrilloId")}>
+                  <optgroup label="Comunes">
+                    {opts.ladrillos_bloques
+                      .filter((l) => l.familia === "comun")
+                      .map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Huecos">
+                    {opts.ladrillos_bloques
+                      .filter((l) => l.familia === "hueco")
+                      .map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Bloques cerámicos portantes">
+                    {opts.ladrillos_bloques
+                      .filter((l) => l.familia === "ceramico_portante")
+                      .map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.id === "bloque_cer_27x19x20"
+                            ? "Bloque cerámico portante 27×19×20"
+                            : l.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Bloques de cemento portantes">
+                    {opts.ladrillos_bloques
+                      .filter((l) => l.familia === "hormigon")
+                      .map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+              </label>
 
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Junta (mm)</span>
-              <select
-                className="rounded border px-3 py-2"
-                {...register("juntaMm", { valueAsNumber: true })}
-              >
-                {opts.juntas_mm.map((j) => (
-                  <option key={j} value={j}>
-                    {j} mm
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Junta (mm)</span>
+                <select
+                  className="rounded border px-3 py-2"
+                  {...register("juntaMm", { valueAsNumber: true })}
+                >
+                  {opts.juntas_mm.map((j) => (
+                    <option key={j} value={j}>
+                      {j} mm
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Mortero de asiento</span>
-              <select
-                className="rounded border px-3 py-2"
-                {...register("morteroAsientoId")}
-              >
-                {(opts.morteros_asiento_ids || []).map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Mortero de asiento</span>
+                <select
+                  className="rounded border px-3 py-2"
+                  {...register("morteroAsientoId")}
+                >
+                  {(opts.morteros_asiento_ids || []).map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <NumberWithUnit
-              label="Longitud (L)"
-              name="L"
-              unit="m"
-              value={watch("L") ?? 0}
-              onChange={(v) => setValue("L", v)}
-            />
-            <NumberWithUnit
-              label="Altura (H)"
-              name="H"
-              unit="m"
-              value={watch("H") ?? 0}
-              onChange={(v) => setValue("H", v)}
-            />
-            <NumberWithUnit
-              label="Superficie adicional (SA)"
-              name="SA"
-              unit="m²"
-              value={watch("SA") ?? 0}
-              onChange={(v) => setValue("SA", v)}
-            />
-          </div>
-
-          {/* Vanos */}
-          <div className="space-y-2">
-            <div className="font-medium">Vanos a descontar (hasta 3)</div>
-            <div className="overflow-x-auto">
-              <OpeningsGroup items={vanos} onChange={setVanos} />
+              <NumberWithUnit
+                label="Longitud (L)"
+                name="L"
+                unit="m"
+                value={watch("L") ?? 0}
+                onChange={(v) => setValue("L", v)}
+              />
+              <NumberWithUnit
+                label="Altura (H)"
+                name="H"
+                unit="m"
+                value={watch("H") ?? 0}
+                onChange={(v) => setValue("H", v)}
+              />
+              <NumberWithUnit
+                label="Superficie adicional (SA)"
+                name="SA"
+                unit="m²"
+                value={watch("SA") ?? 0}
+                onChange={(v) => setValue("SA", v)}
+              />
             </div>
-          </div>
 
-          {/* Desperdicio */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium">Desperdicio (%)</label>
-            <input
-              type="range"
-              min={0}
-              max={20}
-              step={1}
-              value={watch("desperdicioPct") ?? 7}
-              onChange={(e) =>
-                setValue("desperdicioPct", parseInt(e.target.value))
-              }
-            />
-            <span className="text-sm">{watch("desperdicioPct") ?? 7}%</span>
-          </div>
+            {/* Vanos */}
+            <div className="space-y-2">
+              <div className="font-medium">Vanos a descontar (hasta 3)</div>
+              <div className="overflow-x-auto">
+                <OpeningsGroup items={vanos} onChange={setVanos} />
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting || !coeffs || !mortars}
-            className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
-          >
-            Calcular
-          </button>
-        </form>
-      </div>
+            {/* Desperdicio */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium">Desperdicio (%)</label>
+              <input
+                type="range"
+                min={0}
+                max={20}
+                step={1}
+                value={watch("desperdicioPct") ?? 7}
+                onChange={(e) =>
+                  setValue("desperdicioPct", parseInt(e.target.value))
+                }
+              />
+              <span className="text-sm">{watch("desperdicioPct") ?? 7}%</span>
+            </div>
 
-      {/* Card: Resultado */}
-      <div className="card p-4 card--table">
-        <h2 className="text-lg font-semibold mb-2">Resultado</h2>
-        {res ? (
-          items.length ? (
-            <ResultTable title="Resultado" items={items} />
+            <button
+              type="submit"
+              disabled={isSubmitting || !coeffs || !mortars}
+              className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
+            >
+              Calcular
+            </button>
+          </form>
+        </div>
+
+        {/* Card: Resultado */}
+        <div className="card p-4 card--table">
+          <h2 className="text-lg font-semibold mb-2">Resultado</h2>
+          {res ? (
+            items.length ? (
+              <ResultTable title="Resultado" items={items} />
+            ) : (
+              <pre className="text-xs whitespace-pre-wrap">
+                {JSON.stringify(res, null, 2)}
+              </pre>
+            )
           ) : (
-            <pre className="text-xs whitespace-pre-wrap">
-              {JSON.stringify(res, null, 2)}
-            </pre>
-          )
-        ) : (
-          <p className="text-sm text-foreground/60">
-            Ingresá datos y presioná “Calcular” para ver el resultado.
-          </p>
-        )}
+            <p className="text-sm text-foreground/60">
+              Ingresá datos y presioná “Calcular” para ver el resultado.
+            </p>
+          )}
+        </div>
       </div>
-    </div>
-  </section>
-);
 
+      {/* Guardar en Proyecto */}
+      {res && (
+        <AddToProject
+          kind="muro"
+          defaultTitle={defaultTitle}
+          items={itemsForProject}
+          raw={res}
+        />
+      )}
+    </section>
+  );
 }

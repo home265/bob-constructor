@@ -5,7 +5,7 @@ import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/carpeta";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
-
+import AddToProject from "@/components/ui/AddToProject";
 
 // Forma real de tu JSON: { mezclas: [{id,label}], hidrofugo: boolean | array }
 type CarpetaOptionsFile = {
@@ -69,40 +69,70 @@ export default function CarpetaPage() {
     if (tipos.length && !tipos.find((t) => t.key === tipo)) {
       setTipo(tipos[0].key);
     }
-  }, [tipos]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipos]);
 
   useEffect(() => {
     if (hidros.length && !hidros.find((h) => h.key === hidro)) {
       setHidro(hidros[0].key);
     }
-  }, [hidros]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hidros]);
 
   const input = { tipo, hidro, L, A, Hcm: H, wastePct: waste, mixMap, morteros };
   // @ts-ignore – usa tu función real si existe; si no, devuelve el input
   const r = (C.calcCarpeta ?? C.default ?? ((x: any) => x))(input);
 
-  // Construyo filas para la tabla
+  // ---- Filas para la tabla (sin 'key', qty:number)
   const rows: ResultRow[] = [];
-  if (r?.area_m2 != null) rows.push({ label: "Área", qty: r.area_m2, unit: "m²" });
-  if (r?.espesor_cm != null) rows.push({ label: "Espesor", qty: r.espesor_cm, unit: "cm" });
-  const vol = r?.volumen_con_desperdicio_m3 ?? r?.volumen_m3;
-  if (vol != null) rows.push({ label: "Volumen", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (typeof r?.area_m2 === "number")
+    rows.push({ label: "Área", qty: Math.round(r.area_m2 * 100) / 100, unit: "m²" });
+  if (typeof r?.espesor_cm === "number")
+    rows.push({ label: "Espesor", qty: Math.round(r.espesor_cm * 100) / 100, unit: "cm" });
+  const vol = typeof r?.volumen_con_desperdicio_m3 === "number"
+    ? r.volumen_con_desperdicio_m3
+    : (typeof r?.volumen_m3 === "number" ? r.volumen_m3 : undefined);
+  if (typeof vol === "number")
+    rows.push({ label: "Volumen", qty: Math.round(vol * 100) / 100, unit: "m³" });
 
   if (r?.materiales && typeof r.materiales === "object") {
     for (const [k, v] of Object.entries(r.materiales)) {
-      rows.push({ label: keyToLabel(k), qty: Number(v) || 0, unit: keyToUnit(k) });
+      const qty = Math.round((Number(v) || 0) * 100) / 100;
+      rows.push({ label: keyToLabel(k), qty, unit: keyToUnit(k) });
     }
   }
 
-  if (r?.mortero_id) {
-    rows.push({ label: "Mortero", qty: r.mortero_id, unit: "", hint: "Id de ficha" });
-  }
+  if (r?.mortero_id)
+    rows.push({ label: "Mortero (ID)", qty: 1, unit: keyToUnit("mortero_id") ?? "" });
+
+  // ---- Materiales para Proyecto (solo materiales, con key y qty:number)
+  const itemsForProject = useMemo(() => {
+    const list: { key?: string; label: string; qty: number; unit: string }[] = [];
+    if (r?.materiales && typeof r.materiales === "object") {
+      for (const [k, v] of Object.entries(r.materiales)) {
+        list.push({
+          key: k,
+          label: keyToLabel(k),
+          qty: Math.round((Number(v) || 0) * 100) / 100,
+          unit: keyToUnit(k),
+        });
+      }
+    }
+    return list;
+  }, [r?.materiales]);
+
+  // Título de partida por defecto
+  const defaultTitle = useMemo(
+    () => `Carpeta ${L}×${A} m · e=${H} cm · ${tipo}${hidro === "si" ? " + hidrófugo" : ""}`,
+    [L, A, H, tipo, hidro]
+  );
 
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold">Carpeta</h1>
 
       <div className="grid md:grid-cols-2 gap-4">
+        {/* Card: Formulario */}
         <div className="card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
@@ -176,8 +206,22 @@ export default function CarpetaPage() {
           </div>
         </div>
 
-        <ResultTable title="Resultado" items={rows} />
+        {/* Card: Resultado */}
+        <div className="card p-4 card--table">
+          <h2 className="font-medium mb-2">Resultado</h2>
+          <ResultTable title="Resultado" items={rows} />
+        </div>
       </div>
+
+      {/* Guardar en Proyecto */}
+      {itemsForProject.length > 0 && (
+        <AddToProject
+          kind="carpeta"
+          defaultTitle={defaultTitle}
+          items={itemsForProject}
+          raw={r}
+        />
+      )}
     </section>
   );
 }
