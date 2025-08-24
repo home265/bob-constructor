@@ -1,0 +1,57 @@
+[
+  { "ladrillo_id": "ladrillo_comun_canto", "junta_mm": 8,  "unid_por_m2": 66.693, "mortero_asiento_m3_por_m2": 0.0172 },
+  { "ladrillo_id": "ladrillo_comun_canto", "junta_mm": 10, "unid_por_m2": 64.103, "mortero_asiento_m3_por_m2": 0.0208 },
+  { "ladrillo_id": "ladrillo_comun_canto", "junta_mm": 12, "unid_por_m2": 61.675, "mortero_asiento_m3_por_m2": 0.0242 },
+
+  { "ladrillo_id": "ladrillo_comun_15", "junta_mm": 8,  "unid_por_m2": 66.693, "mortero_asiento_m3_por_m2": 0.0234 },
+  { "ladrillo_id": "ladrillo_comun_15", "junta_mm": 10, "unid_por_m2": 64.103, "mortero_asiento_m3_por_m2": 0.0284 },
+  { "ladrillo_id": "ladrillo_comun_15", "junta_mm": 12, "unid_por_m2": 61.675, "mortero_asiento_m3_por_m2": 0.0330 },
+
+  { "ladrillo_id": "ladrillo_comun_30", "junta_mm": 8,  "unid_por_m2": 66.693, "mortero_asiento_m3_por_m2": 0.0469 },
+  { "ladrillo_id": "ladrillo_comun_30", "junta_mm": 10, "unid_por_m2": 64.103, "mortero_asiento_m3_por_m2": 0.0567 },
+  { "ladrillo_id": "ladrillo_comun_30", "junta_mm": 12, "unid_por_m2": 61.675, "mortero_asiento_m3_por_m2": 0.0659 },
+
+  { "ladrillo_id": "ladrillo_comun_45", "junta_mm": 8,  "unid_por_m2": 66.693, "mortero_asiento_m3_por_m2": 0.0703 },
+  { "ladrillo_id": "ladrillo_comun_45", "junta_mm": 10, "unid_por_m2": 64.103, "mortero_asiento_m3_por_m2": 0.0851 },
+  { "ladrillo_id": "ladrillo_comun_45", "junta_mm": 12, "unid_por_m2": 61.675, "mortero_asiento_m3_por_m2": 0.0989 },
+
+  { "ladrillo_id": "hueco_8x18x33",  "junta_mm": 8,  "unid_por_m2": 15.737, "mortero_asiento_m3_por_m2": 0.0052 },
+  { "ladrillo_id": "hueco_8x18x33",  "junta_mm": 10, "unid_por_m2": 15.480, "mortero_asiento_m3_por_m2": 0.0064 },
+  { "ladrillo_id": "hueco_8x18x33",  "junta_mm": 12, "unid_por_m2": 15.229, "mortero_asiento_m3_por_m2": 0.0076 },
+
+  { "ladrillo_id": "hueco_12x18x33", "junta_mm": 8,  "unid_por_m2": 15.737, "mortero_asiento_m3_por_m2": 0.0078 },
+  { "ladrillo_id": "hueco_12x18x33", "junta_mm": 10, "unid_por_m2": 15.480, "mortero_asiento_m3_por_m2": 0.0097 },
+  { "ladrillo_id": "hueco_12x18x33", "junta_mm": 12, "unid_por_m2": 15.229, "mortero_asiento_m3_por_m2": 0.0114 },
+
+  { "ladrillo_id": "hueco_18x18x33", "junta_mm": 8,  "unid_por_m2": 15.737, "mortero_asiento_m3_por_m2": 0.0117 },
+  { "ladrillo_id": "hueco_18x18x33", "junta_mm": 10, "unid_por_m2": 15.480, "mortero_asiento_m3_por_m2": 0.0145 },
+  { "ladrillo_id": "hueco_18x18x33", "junta_mm": 12, "unid_por_m2": 15.229, "mortero_asiento_m3_por_m2": 0.0172 },
+
+  { "ladrillo_id": "bloque_cer_12x19x33", "junta_mm": 8,  "unid_por_m2": 14.942, "mortero_asiento_m3_por_m2": 0.0076 },
+  { "ladrillo_id": "bloque_cer_12x19x33", "junta_mm": 10, "unid_por_m2": 14.706, "mortero_asiento_m3_por_m2": 0.0094 },
+  { "ladrillo_id": "bloque_cer_12x19x33", "junta_mm": 12, "unid_por_m2": 14.475, "mortero_asiento_m3_por_m2": 0.0111 },
+
+  { "ladrillo_id": "bloque_cer_18x19x33", "junta_mm": 8,  "unid_por_m2": 14.942, "mortero_asiento_m3_por_m2": 0.0114 },
+  { "ladrillo_id": "bloque_cer_18x19x33", "junta_mm": 10, "unid_por_m2": 14.706, "mortero_asiento_m3_por_m2": 0.0140 },
+  { "ladrillo_id": "bloque_cer_18x19x33", "junta_mm": 12, "unid_por_m2": 14.475, "mortero_asiento_m3_por_m2": 0.0166 },
+
+  { "ladrillo_id": "bloque_cer_27x19x20", "junta_mm": 8,  "unid_por_m2": 24.281, "mortero_asiento_m3_por_m2": 0.0209 },
+  { "ladrillo_id": "bloque_cer_27x19x20", "junta_mm": 10, "unid_por_m2": 23.810, "mortero_asiento_m3_por_m2": 0.0257 },
+  { "ladrillo_id": "bloque_cer_27x19x20", "junta_mm": 12, "unid_por_m2": 23.351, "mortero_asiento_m3_por_m2": 0.0304 },
+
+  { "ladrillo_id": "bloque_horm_19x20x39", "junta_mm": 8,  "unid_por_m2": 12.690, "mortero_asiento_m3_por_m2": 0.0113 },
+  { "ladrillo_id": "bloque_horm_19x20x39", "junta_mm": 10, "unid_por_m2": 12.500, "mortero_asiento_m3_por_m2": 0.0140 },
+  { "ladrillo_id": "bloque_horm_19x20x39", "junta_mm": 12, "unid_por_m2": 12.315, "mortero_asiento_m3_por_m2": 0.0166 },
+
+  { "ladrillo_id": "bloque_horm_19x15x39", "junta_mm": 8,  "unid_por_m2": 12.690, "mortero_asiento_m3_por_m2": 0.0090 },
+  { "ladrillo_id": "bloque_horm_19x15x39", "junta_mm": 10, "unid_por_m2": 12.500, "mortero_asiento_m3_por_m2": 0.0113 },
+  { "ladrillo_id": "bloque_horm_19x15x39", "junta_mm": 12, "unid_por_m2": 12.315, "mortero_asiento_m3_por_m2": 0.0131 },
+
+  { "ladrillo_id": "bloque_horm_19x13x39", "junta_mm": 8,  "unid_por_m2": 12.690, "mortero_asiento_m3_por_m2": 0.0078 },
+  { "ladrillo_id": "bloque_horm_19x13x39", "junta_mm": 10, "unid_por_m2": 12.500, "mortero_asiento_m3_por_m2": 0.0099 },
+  { "ladrillo_id": "bloque_horm_19x13x39", "junta_mm": 12, "unid_por_m2": 12.315, "mortero_asiento_m3_por_m2": 0.0114 },
+
+  { "ladrillo_id": "bloque_horm_19x10x39", "junta_mm": 8,  "unid_por_m2": 12.690, "mortero_asiento_m3_por_m2": 0.0060 },
+  { "ladrillo_id": "bloque_horm_19x10x39", "junta_mm": 10, "unid_por_m2": 12.500, "mortero_asiento_m3_por_m2": 0.0078 },
+  { "ladrillo_id": "bloque_horm_19x10x39", "junta_mm": 12, "unid_por_m2": 12.315, "mortero_asiento_m3_por_m2": 0.0087 }
+]

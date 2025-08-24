@@ -1,0 +1,15 @@
+{
+  "lados": [
+    { "id": "uno", "label": "Un lado" },
+    { "id": "ambos", "label": "Ambos lados" }
+  ],
+  "terminaciones_ids": [
+    "revoque_grueso",
+    "revoque_fino",
+    "revoque_grueso_fino",
+    "revoque_grueso_yeso",
+    "yeso_engrosado_enlucido",
+    "yeso_enlucido"
+  ],
+  "hidrofugo": true
+}

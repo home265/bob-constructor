@@ -1,0 +1,9 @@
+{
+  "name": "Bob Constructor",
+  "short_name": "Bob",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2C3333",
+  "theme_color": "#2C3333",
+  "description": "Cómputo de materiales - PWA"
+}

@@ -1,0 +1,10 @@
+{
+  "pasos_estribo_mm": [100, 150, 200, 250],
+  "recubrimiento_cm_interior": 2.0,
+  "recubrimiento_cm_exterior": 3.0,
+  "longitudes_extra": {
+    "gancho_90_grados_mm": "10*phi",
+    "gancho_135_grados_mm": "12*phi",
+    "solape_long_mm": "40*phi"
+  }
+}

@@ -1,0 +1,14 @@
+[
+  { "id": "revoque_grueso", "label": "Revoque grueso", "espesor_mm_default": 15, "mortero_id": "revoque_grueso_con_cal" },
+  { "id": "revoque_fino", "label": "Revoque fino", "espesor_mm_default": 5, "mortero_id": "revoque_fino_sin_cal" },
+  { "id": "revoque_grueso_fino", "label": "Revoque grueso + fino", "espesor_mm_default": 20, "capas": [
+      { "label": "Grueso", "espesor_mm": 15, "mortero_id": "revoque_grueso_con_cal" },
+      { "label": "Fino", "espesor_mm": 5, "mortero_id": "revoque_fino_sin_cal" }
+    ] },
+  { "id": "revoque_grueso_yeso", "label": "Revoque grueso + enlucido de yeso", "espesor_mm_default": 20, "capas": [
+      { "label": "Grueso", "espesor_mm": 15, "mortero_id": "revoque_grueso_con_cal" },
+      { "label": "Yeso enlucido", "espesor_mm": 5, "mortero_id": "revoque_fino_sin_cal" }
+    ] },
+  { "id": "yeso_engrosado_enlucido", "label": "Yeso (engrosado + enlucido)", "espesor_mm_default": 20 },
+  { "id": "yeso_enlucido", "label": "Yeso (enlucido)", "espesor_mm_default": 5 }
+]

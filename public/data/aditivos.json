@@ -1,0 +1,4 @@
+[
+  { "id": "hidrofugo_mortero", "label": "Hidrófugo para mortero", "l_por_m3": 1.0, "unidad_compra": "litro" },
+  { "id": "plastificante_mortero", "label": "Plastificante", "l_por_m3": 0.5, "unidad_compra": "litro" }
+]

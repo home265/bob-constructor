@@ -1,0 +1,8 @@
+[
+  { "tipo": "ceramica_piso",  "tamano_cm": "30x30", "m2_por_caja": 1.35, "piezas_por_caja": 15 },
+  { "tipo": "porcelanato_piso","tamano_cm": "60x60","m2_por_caja": 1.44, "piezas_por_caja": 4 },
+  { "tipo": "ceramica_pared", "tamano_cm": "30x60","m2_por_caja": 1.26, "piezas_por_caja": 7 },
+  { "tipo": "porcelanato_pared","tamano_cm": "20x60","m2_por_caja": 1.20, "piezas_por_caja": 10 },
+  { "tipo": "baldosa_cal",    "tamano_cm": "45x45","m2_por_caja": 1.42, "piezas_por_caja": 7 },
+  { "tipo": "venecita_cem_blanco","tamano_cm": "31x31","m2_por_caja": 2.00, "piezas_por_caja": 20 }
+]

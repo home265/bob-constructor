@@ -1,0 +1,5 @@
+[
+  { "id": "adhesivo_ceramico_c1", "label": "Adhesivo C1 cerámico", "kg_m2_por_mm": 0.5, "bolsa_kg": 30 },
+  { "id": "adhesivo_porcelanato_c2", "label": "Adhesivo C2 porcelanato", "kg_m2_por_mm": 0.6, "bolsa_kg": 30 },
+  { "id": "cemento_blanco", "label": "Cemento blanco (venecita/baldosa)", "kg_m2_por_mm": 0.55, "bolsa_kg": 50 }
+]

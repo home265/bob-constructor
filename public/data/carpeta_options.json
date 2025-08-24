@@ -1,0 +1,10 @@
+{
+  "mezclas": [
+    { "id": "1_2", "label": "Cemento 1:2" },
+    { "id": "1_3", "label": "Cemento 1:3" },
+    { "id": "1_4", "label": "Cemento 1:4" },
+    { "id": "1_5", "label": "Cemento 1:5" },
+    { "id": "1_2_6", "label": "Cemento y cal 1:2:6" }
+  ],
+  "hidrofugo": true
+}

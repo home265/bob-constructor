@@ -1,0 +1,12 @@
+{
+  "tipos": [
+    { "id": "ceramica_piso", "label": "Cerámicas en piso" },
+    { "id": "porcelanato_piso", "label": "Porcelanatos en piso" },
+    { "id": "ceramica_pared", "label": "Cerámicas en pared" },
+    { "id": "porcelanato_pared", "label": "Porcelanatos en pared" },
+    { "id": "baldosa_cal", "label": "Baldosas con cal" },
+    { "id": "venecita_cem_blanco", "label": "Venecita con cemento blanco" }
+  ],
+  "tamanos_sugeridos_cm": ["30x30", "45x45", "60x60", "20x60", "30x60"],
+  "adhesivo_espesor_mm_sugeridos": [3, 5, 10]
+}

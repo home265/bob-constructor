@@ -1,0 +1,99 @@
+[
+  {
+    "id": "cemento_50kg",
+    "categoria": "aglomerantes",
+    "subcategoria": "cemento",
+    "nombre": "Cemento Portland 50 kg",
+    "unidad_base": "bolsa",
+    "unidad_compra": "bolsa",
+    "cobertura_compra_en_base": 1,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "cal_25kg",
+    "categoria": "aglomerantes",
+    "subcategoria": "cal",
+    "nombre": "Cal hidratada 25 kg",
+    "unidad_base": "kg",
+    "unidad_compra": "bolsa",
+    "cobertura_compra_en_base": 25,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "arena_m3",
+    "categoria": "aridos",
+    "subcategoria": "arena",
+    "nombre": "Arena gruesa (m³)",
+    "unidad_base": "m3",
+    "unidad_compra": "m3",
+    "cobertura_compra_en_base": 1,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "hueco_12x18x33_un",
+    "categoria": "mamposteria",
+    "subcategoria": "ladrillo_hueco",
+    "nombre": "Ladrillo hueco 12×18×33 (unidad)",
+    "unidad_base": "unidad",
+    "unidad_compra": "unidad",
+    "cobertura_compra_en_base": 1,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "malla_Q188_m2",
+    "categoria": "aceros",
+    "subcategoria": "malla",
+    "nombre": "Malla Q-188 (m²)",
+    "unidad_base": "m2",
+    "unidad_compra": "m2",
+    "cobertura_compra_en_base": 1,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "adhesivo_c1_bolsa30",
+    "categoria": "adhesivos",
+    "subcategoria": "c1",
+    "nombre": "Adhesivo C1 cerámico 30 kg",
+    "unidad_base": "kg",
+    "unidad_compra": "bolsa",
+    "cobertura_compra_en_base": 30,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "adhesivo_c2_bolsa30",
+    "categoria": "adhesivos",
+    "subcategoria": "c2",
+    "nombre": "Adhesivo C2 porcelanato 30 kg",
+    "unidad_base": "kg",
+    "unidad_compra": "bolsa",
+    "cobertura_compra_en_base": 30,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  },
+  {
+    "id": "pastina_bolsa2",
+    "categoria": "adhesivos",
+    "subcategoria": "pastina",
+    "nombre": "Pastina 2 kg",
+    "unidad_base": "kg",
+    "unidad_compra": "bolsa",
+    "cobertura_compra_en_base": 2,
+    "precio_unitario": 0,
+    "proveedor": "",
+    "fecha_precio": ""
+  }
+]
+

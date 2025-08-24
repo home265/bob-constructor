@@ -1,0 +1,83 @@
+[
+  {
+    "id": "asiento_sin_cal",
+    "nombre": "Mortero asiento 1:4 (sin cal)",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 4 },
+    "bolsas_cemento_por_m3": 7.0,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 180
+  },
+  {
+    "id": "asiento_con_cal",
+    "nombre": "Mortero asiento 1:0.5:4.5 (con cal)",
+    "proporcion": { "cemento": 1, "cal": 0.5, "arena": 4.5 },
+    "bolsas_cemento_por_m3": 6.5,
+    "kg_cal_por_m3": 250,
+    "agua_l_por_m3": 200
+  },
+  {
+    "id": "revoque_grueso_con_cal",
+    "nombre": "Revoque grueso 1:0.5:4.5",
+    "proporcion": { "cemento": 1, "cal": 0.5, "arena": 4.5 },
+    "bolsas_cemento_por_m3": 6.5,
+    "kg_cal_por_m3": 250,
+    "agua_l_por_m3": 200
+  },
+  {
+    "id": "revoque_fino_sin_cal",
+    "nombre": "Revoque fino 1:3 (sin cal)",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 3 },
+    "bolsas_cemento_por_m3": 7.2,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 170
+  },
+  {
+    "id": "contrapiso_1_3",
+    "nombre": "Contrapiso 1:3",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 3 },
+    "bolsas_cemento_por_m3": 7.0,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 180
+  },
+  {
+    "id": "carpeta_1_2",
+    "nombre": "Carpeta 1:2",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 2 },
+    "bolsas_cemento_por_m3": 9.0,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 170
+  },
+  {
+    "id": "carpeta_1_3",
+    "nombre": "Carpeta 1:3",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 3 },
+    "bolsas_cemento_por_m3": 7.2,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 170
+  },
+  {
+    "id": "carpeta_1_4",
+    "nombre": "Carpeta 1:4",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 4 },
+    "bolsas_cemento_por_m3": 6.5,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 165
+  },
+  {
+    "id": "carpeta_1_5",
+    "nombre": "Carpeta 1:5",
+    "proporcion": { "cemento": 1, "cal": 0, "arena": 5 },
+    "bolsas_cemento_por_m3": 6.0,
+    "kg_cal_por_m3": 0,
+    "agua_l_por_m3": 160
+  },
+  {
+    "id": "carpeta_1_2_6",
+    "nombre": "Carpeta 1:2:6 (cemento+cal)",
+    "proporcion": { "cemento": 1, "cal": 2, "arena": 6 },
+    "bolsas_cemento_por_m3": 5.5,
+    "kg_cal_por_m3": 300,
+    "agua_l_por_m3": 180
+  }
+]
+

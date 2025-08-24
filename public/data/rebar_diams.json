@@ -1,0 +1,8 @@
+[
+  { "phi_mm": 6,  "kg_por_m": 0.222 },
+  { "phi_mm": 8,  "kg_por_m": 0.395 },
+  { "phi_mm": 10, "kg_por_m": 0.617 },
+  { "phi_mm": 12, "kg_por_m": 0.888 },
+  { "phi_mm": 16, "kg_por_m": 1.580 }
+]
+

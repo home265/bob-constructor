@@ -1,0 +1,41 @@
+{
+  "tipo_muro": [
+    { "id": "simple", "label": "Muro simple" },
+    { "id": "doble", "label": "Muro doble" }
+  ],
+  "ladrillos_bloques": [
+    { "id": "ladrillo_comun_canto", "label": "Ladrillo común de canto", "familia": "comun" },
+    { "id": "ladrillo_comun_15", "label": "Ladrillo común 15 cm", "familia": "comun" },
+    { "id": "ladrillo_comun_30", "label": "Ladrillo común 30 cm", "familia": "comun" },
+    { "id": "ladrillo_comun_45", "label": "Ladrillo común 45 cm", "familia": "comun" },
+
+    { "id": "hueco_8x18x33",  "label": "Ladrillo hueco 8×18×33",  "familia": "hueco",   "dims_mm": { "e": 80,  "h": 180, "l": 330 } },
+    { "id": "hueco_12x18x33", "label": "Ladrillo hueco 12×18×33", "familia": "hueco",   "dims_mm": { "e": 120, "h": 180, "l": 330 } },
+    { "id": "hueco_18x18x33", "label": "Ladrillo hueco 18×18×33", "familia": "hueco",   "dims_mm": { "e": 180, "h": 180, "l": 330 } },
+
+    { "id": "bloque_cer_12x19x33", "label": "Bloque cerámico portante 12×19×33", "familia": "ceramico_portante", "dims_mm": { "e": 120, "h": 190, "l": 330 } },
+    { "id": "bloque_cer_18x19x33", "label": "Bloque cerámico portante 18×19×33", "familia": "ceramico_portante", "dims_mm": { "e": 180, "h": 190, "l": 330 } },
+    { "id": "bloque_cer_27x19x20", "label": "Bloque cerámico portante 27×19×20", "familia": "ceramico_portante", "dims_mm": { "e": 270, "h": 190, "l": 200 } },
+
+    { "id": "bloque_horm_19x20x39", "label": "Bloque de cemento portante 19×20×39", "familia": "hormigon", "dims_mm": { "e": 190, "h": 200, "l": 390 } },
+    { "id": "bloque_horm_19x15x39", "label": "Bloque de cemento portante 19×15×39", "familia": "hormigon", "dims_mm": { "e": 190, "h": 150, "l": 390 } },
+    { "id": "bloque_horm_19x13x39", "label": "Bloque de cemento portante 19×13×39", "familia": "hormigon", "dims_mm": { "e": 190, "h": 130, "l": 390 } },
+    { "id": "bloque_horm_19x10x39", "label": "Bloque de cemento portante 19×10×39", "familia": "hormigon", "dims_mm": { "e": 190, "h": 100, "l": 390 } }
+  ],
+  "juntas_mm": [8, 10, 12],
+  "morteros_asiento_ids": [
+    "asiento_sin_cal",
+    "asiento_con_cal"
+  ],
+  "revoques_ids": [
+    "revoque_grueso",
+    "revoque_fino",
+    "revoque_grueso_fino",
+    "revoque_grueso_yeso",
+    "yeso_engrosado_enlucido",
+    "yeso_enlucido"
+  ],
+  "flags": {
+    "aislamiento_termico": true
+  }
+}

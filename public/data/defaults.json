@@ -1,0 +1,17 @@
+{
+  "desperdicio_pct": {
+    "muros": 7,
+    "revoques": 5,
+    "contrapiso": 5,
+    "carpeta": 5,
+    "revestimientos": 10,
+    "hormigon": 3
+  },
+  "redondeo": {
+    "bolsas": "ceil",
+    "cajas": "ceil",
+    "rollos": "ceil",
+    "m3": "ceil_0.01"
+  },
+  "max_vanos": 3
+}

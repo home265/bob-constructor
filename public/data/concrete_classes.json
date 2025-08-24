@@ -1,0 +1,7 @@
+[
+  { "id": "H-17", "bolsas_cem_por_m3": 6.0, "arena_m3_por_m3": 0.5, "piedra_m3_por_m3": 0.8, "agua_l_por_m3": 180 },
+  { "id": "H-21", "bolsas_cem_por_m3": 7.0, "arena_m3_por_m3": 0.5, "piedra_m3_por_m3": 0.8, "agua_l_por_m3": 185 },
+  { "id": "H-25", "bolsas_cem_por_m3": 8.0, "arena_m3_por_m3": 0.5, "piedra_m3_por_m3": 0.8, "agua_l_por_m3": 190 },
+  { "id": "H-30", "bolsas_cem_por_m3": 9.0, "arena_m3_por_m3": 0.5, "piedra_m3_por_m3": 0.8, "agua_l_por_m3": 195 }
+]
+

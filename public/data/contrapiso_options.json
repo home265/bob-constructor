@@ -1,0 +1,23 @@
+{
+  "tipos": [
+    { "id": "cascote_terreno", "label": "Cascote sobre terreno absorbente" },
+    { "id": "cascote_losa", "label": "Cascote sobre losa" },
+    { "id": "armado", "label": "Armado" },
+    { "id": "eps_200", "label": "Aliviado EPS 200" },
+    { "id": "eps_250", "label": "Aliviado EPS 250" },
+    { "id": "eps_300", "label": "Aliviado EPS 300" },
+    { "id": "eps_350", "label": "Aliviado EPS 350" },
+    { "id": "leca", "label": "Aliviado con leca" }
+  ],
+  "mallas_sima": [
+    { "id": "Q-131", "label": "Malla Q-131" },
+    { "id": "Q-188", "label": "Malla Q-188" },
+    { "id": "Q-221", "label": "Malla Q-221" }
+  ],
+  "opciones": {
+    "membrana": true,
+    "pintura": true,
+    "aislacion_termica": true,
+    "juntas_dilatacion": true
+  }
+}

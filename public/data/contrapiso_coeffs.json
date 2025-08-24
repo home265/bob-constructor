@@ -1,0 +1,7 @@
+[
+  { "tipo_id": "cascote_terreno", "mortero_id": "contrapiso_1_3", "requiere_malla": false, "densidad_relleno_kg_m3": null },
+  { "tipo_id": "cascote_losa",    "mortero_id": "contrapiso_1_3", "requiere_malla": true,  "malla_default_id": "Q-188", "densidad_relleno_kg_m3": null },
+  { "tipo_id": "armado",          "mortero_id": "contrapiso_1_3", "requiere_malla": true,  "malla_default_id": "Q-221", "densidad_relleno_kg_m3": null },
+  { "tipo_id": "eps_200",         "mortero_id": "contrapiso_1_3", "requiere_malla": true,  "malla_default_id": "Q-188", "densidad_relleno_kg_m3": 20 },
+  { "tipo_id": "leca",            "mortero_id": "contrapiso_1_3", "requiere_malla": true,  "malla_default_id": "Q-188", "densidad_relleno_kg_m3": 350 }
+]

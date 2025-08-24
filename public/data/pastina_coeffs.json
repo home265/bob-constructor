@@ -1,0 +1,5 @@
+[
+  { "tamano_cm": "60x60", "ancho_junta_mm": 3, "kg_por_m2": 0.40 },
+  { "tamano_cm": "30x30", "ancho_junta_mm": 3, "kg_por_m2": 0.80 },
+  { "tamano_cm": "30x60", "ancho_junta_mm": 2, "kg_por_m2": 0.50 }
+]
