@@ -116,3 +116,11 @@ input:focus, select:focus, textarea:focus{
   padding:.5rem .75rem; border-bottom:1px solid var(--border);
 }
 .table th{ text-align:left; color: color-mix(in srgb, var(--color-neutral) 85%, white 15%); }
+
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* tablas dentro de tarjetas: scroll horizontal en pantallas chicas */
+.card--table {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

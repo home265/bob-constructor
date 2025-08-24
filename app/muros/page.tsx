@@ -122,165 +122,175 @@ export default function PageMuros() {
 
   if (!opts) return <p>Cargando catálogos…</p>;
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Muros</h1>
+ return (
+  <section className="space-y-6">
+    <h1 className="text-xl font-semibold">Muros</h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Selecciones */}
-        <div className="grid md:grid-cols-3 gap-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Tipo de muro</span>
-            <select className="rounded border px-3 py-2" {...register("tipoMuroId")}>
-              {opts.tipo_muro.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
+    <div className="grid md:grid-cols-2 gap-4">
+      {/* Card: Formulario */}
+      <div className="card p-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Selecciones */}
+          <div className="grid md:grid-cols-3 gap-4">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">Tipo de muro</span>
+              <select className="rounded border px-3 py-2" {...register("tipoMuroId")}>
+                {opts.tipo_muro.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Ladrillo / Bloque</span>
-            <select className="rounded border px-3 py-2" {...register("ladrilloId")}>
-              <optgroup label="Comunes">
-                {opts.ladrillos_bloques
-                  .filter((l) => l.familia === "comun")
-                  .map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Huecos">
-                {opts.ladrillos_bloques
-                  .filter((l) => l.familia === "hueco")
-                  .map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Bloques cerámicos portantes">
-                {opts.ladrillos_bloques
-                  .filter((l) => l.familia === "ceramico_portante")
-                  .map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.id === "bloque_cer_27x19x20"
-                        ? "Bloque cerámico portante 27×19×20"
-                        : l.label}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Bloques de cemento portantes">
-                {opts.ladrillos_bloques
-                  .filter((l) => l.familia === "hormigon")
-                  .map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
-          </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">Ladrillo / Bloque</span>
+              <select className="rounded border px-3 py-2" {...register("ladrilloId")}>
+                <optgroup label="Comunes">
+                  {opts.ladrillos_bloques
+                    .filter((l) => l.familia === "comun")
+                    .map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Huecos">
+                  {opts.ladrillos_bloques
+                    .filter((l) => l.familia === "hueco")
+                    .map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Bloques cerámicos portantes">
+                  {opts.ladrillos_bloques
+                    .filter((l) => l.familia === "ceramico_portante")
+                    .map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.id === "bloque_cer_27x19x20"
+                          ? "Bloque cerámico portante 27×19×20"
+                          : l.label}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Bloques de cemento portantes">
+                  {opts.ladrillos_bloques
+                    .filter((l) => l.familia === "hormigon")
+                    .map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+            </label>
 
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Junta (mm)</span>
-            <select
-              className="rounded border px-3 py-2"
-              {...register("juntaMm", { valueAsNumber: true })}
-            >
-              {opts.juntas_mm.map((j) => (
-                <option key={j} value={j}>
-                  {j} mm
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">Junta (mm)</span>
+              <select
+                className="rounded border px-3 py-2"
+                {...register("juntaMm", { valueAsNumber: true })}
+              >
+                {opts.juntas_mm.map((j) => (
+                  <option key={j} value={j}>
+                    {j} mm
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Mortero de asiento</span>
-            <select
-              className="rounded border px-3 py-2"
-              {...register("morteroAsientoId")}
-            >
-              {(opts.morteros_asiento_ids || []).map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">Mortero de asiento</span>
+              <select
+                className="rounded border px-3 py-2"
+                {...register("morteroAsientoId")}
+              >
+                {(opts.morteros_asiento_ids || []).map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <NumberWithUnit
-            label="Longitud (L)"
-            name="L"
-            unit="m"
-            value={watch("L") ?? 0}
-            onChange={(v) => setValue("L", v)}
-          />
-          <NumberWithUnit
-            label="Altura (H)"
-            name="H"
-            unit="m"
-            value={watch("H") ?? 0}
-            onChange={(v) => setValue("H", v)}
-          />
-          <NumberWithUnit
-            label="Superficie adicional (SA)"
-            name="SA"
-            unit="m²"
-            value={watch("SA") ?? 0}
-            onChange={(v) => setValue("SA", v)}
-          />
-        </div>
+            <NumberWithUnit
+              label="Longitud (L)"
+              name="L"
+              unit="m"
+              value={watch("L") ?? 0}
+              onChange={(v) => setValue("L", v)}
+            />
+            <NumberWithUnit
+              label="Altura (H)"
+              name="H"
+              unit="m"
+              value={watch("H") ?? 0}
+              onChange={(v) => setValue("H", v)}
+            />
+            <NumberWithUnit
+              label="Superficie adicional (SA)"
+              name="SA"
+              unit="m²"
+              value={watch("SA") ?? 0}
+              onChange={(v) => setValue("SA", v)}
+            />
+          </div>
 
-        {/* Vanos */}
-        <div className="space-y-2">
-          <div className="font-medium">Vanos a descontar (hasta 3)</div>
-          <OpeningsGroup items={vanos} onChange={setVanos} />
-        </div>
+          {/* Vanos */}
+          <div className="space-y-2">
+            <div className="font-medium">Vanos a descontar (hasta 3)</div>
+            <div className="overflow-x-auto">
+              <OpeningsGroup items={vanos} onChange={setVanos} />
+            </div>
+          </div>
 
-        {/* Desperdicio */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium">Desperdicio (%)</label>
-          <input
-            type="range"
-            min={0}
-            max={20}
-            step={1}
-            value={watch("desperdicioPct") ?? 7}
-            onChange={(e) =>
-              setValue("desperdicioPct", parseInt(e.target.value))
-            }
-          />
-          <span className="text-sm">{watch("desperdicioPct") ?? 7}%</span>
-        </div>
+          {/* Desperdicio */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium">Desperdicio (%)</label>
+            <input
+              type="range"
+              min={0}
+              max={20}
+              step={1}
+              value={watch("desperdicioPct") ?? 7}
+              onChange={(e) =>
+                setValue("desperdicioPct", parseInt(e.target.value))
+              }
+            />
+            <span className="text-sm">{watch("desperdicioPct") ?? 7}%</span>
+          </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || !coeffs || !mortars}
-          className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
-        >
-          Calcular
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={isSubmitting || !coeffs || !mortars}
+            className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
+          >
+            Calcular
+          </button>
+        </form>
+      </div>
 
-      {res ? (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Resultado</h2>
-          {items.length ? (
+      {/* Card: Resultado */}
+      <div className="card p-4 card--table">
+        <h2 className="text-lg font-semibold mb-2">Resultado</h2>
+        {res ? (
+          items.length ? (
             <ResultTable title="Resultado" items={items} />
           ) : (
-            <div className="card p-4">
-              <h2 className="font-medium mb-2">Resultado</h2>
-              <pre className="text-xs whitespace-pre-wrap">
-                {JSON.stringify(res, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      ) : null}
+            <pre className="text-xs whitespace-pre-wrap">
+              {JSON.stringify(res, null, 2)}
+            </pre>
+          )
+        ) : (
+          <p className="text-sm text-foreground/60">
+            Ingresá datos y presioná “Calcular” para ver el resultado.
+          </p>
+        )}
+      </div>
     </div>
-  );
+  </section>
+);
+
 }

@@ -206,24 +206,39 @@ export default function RevoquePage() {
         </div>
       </div>
 
-      <ResultTable
-        title="Resultado"
-        items={(function (): ResultRow[] {
-          const out: ResultRow[] = [];
-          if (res?.area_m2 != null) out.push({ label: "Área", qty: res.area_m2, unit: "m²" });
-          if (res?.espesor_cm != null) out.push({ label: "Espesor", qty: res.espesor_cm, unit: "cm" });
+      <div className="card p-4 card--table">
+        <ResultTable
+          title="Resultado"
+          items={(function () {
+            const out: ResultRow[] = [];
+            if (res?.area_m2 != null)
+              out.push({ label: "Área", qty: res.area_m2, unit: "m²" });
+            if (res?.espesor_cm != null)
+              out.push({ label: "Espesor", qty: res.espesor_cm, unit: "cm" });
 
-          const vol = res?.mortero_con_desperdicio_m3 ?? res?.mortero_m3;
-          if (vol != null) out.push({ label: "Mortero", qty: vol, unit: "m³", hint: "Con desperdicio" });
+            const vol =
+              res?.mortero_con_desperdicio_m3 ?? res?.mortero_m3;
+            if (vol != null)
+              out.push({
+                label: "Mortero",
+                qty: vol,
+                unit: "m³",
+                hint: "Con desperdicio",
+              });
 
-          if (Array.isArray(res?.terminaciones) && res.terminaciones.length) {
-            out.push({ label: "Terminaciones", qty: res.terminaciones.join(" + ") });
-          }
-          return out;
-        })()}
-      />
+            if (Array.isArray(res?.terminaciones) && res.terminaciones.length) {
+              out.push({
+                label: "Terminaciones",
+                qty: res.terminaciones.join(" + "),
+              });
+            }
+            return out;
+          })()}
+        />
+      </div>
     </div>
   </section>
 );
+
 
 }
