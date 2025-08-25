@@ -64,6 +64,62 @@ export function removePartida(projectId: string, partidaId: string) {
   saveProject(p);
 }
 
+// 🔹 NUEVO: obtener una partida por id
+export function getPartida(projectId: string, partidaId: string): Partida | null {
+  const p = getProject(projectId);
+  if (!p) return null;
+  return p.partes.find(x => x.id === partidaId) || null;
+}
+
+// 🔹 NUEVO: actualizar (merge) una partida existente
+export function updatePartida(
+  projectId: string,
+  partidaId: string,
+  patch: Partial<Omit<Partida, "id" | "createdAt">>
+): Partida {
+  const p = getProject(projectId);
+  if (!p) throw new Error("Proyecto no encontrado");
+  const i = p.partes.findIndex(x => x.id === partidaId);
+  if (i === -1) throw new Error("Partida no encontrada");
+
+  const actual = p.partes[i];
+  const actualizado: Partida = {
+    ...actual,
+    ...patch,
+    id: actual.id,                // aseguramos identidad
+    createdAt: actual.createdAt,  // preservamos creación
+  };
+
+  p.partes[i] = actualizado;
+  p.updatedAt = Date.now();
+  saveProject(p);
+  return actualizado;
+}
+
+// 🔹 OPCIONAL: duplicar una partida (con nuevos id/createdAt)
+export function duplicatePartida(
+  projectId: string,
+  partidaId: string,
+  overrides?: Partial<Omit<Partida, "id" | "createdAt">>
+): Partida {
+  const p = getProject(projectId);
+  if (!p) throw new Error("Proyecto no encontrado");
+  const original = p.partes.find(x => x.id === partidaId);
+  if (!original) throw new Error("Partida no encontrada");
+
+  const copia: Partida = {
+    ...original,
+    ...overrides,
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+  };
+
+  p.partes.push(copia);
+  p.updatedAt = Date.now();
+  saveProject(p);
+  return copia;
+}
+
 export function setActiveProjectId(id: string) {
   if (!isBrowser()) return;
   try { localStorage.setItem(ACTIVE, id); } catch {}

@@ -1,15 +1,51 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, Suspense } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/columna";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import AddToProject from "@/components/ui/AddToProject";
- // 👈 NUEVO
 
-type ConcreteRow = { id?: string; label?: string };
+// (A) lote local
+import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
+import BatchList from "@/components/ui/BatchList";
+import type { MaterialRow, Unit } from "@/lib/project/types";
+
+// (C) edición / deep-link
+import { useSearchParams } from "next/navigation";
+import { getPartida, updatePartida } from "@/lib/project/storage";
+
+// helpers etiquetas/unidades
+import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
+
+type ConcreteRow = {
+  id?: string;
+  label?: string;
+  bolsas_cemento_por_m3?: number;
+  cemento_bolsas_por_m3?: number;
+  cemento_kg_por_m3?: number;
+  arena_m3_por_m3?: number;
+  grava_m3_por_m3?: number;
+  piedra_m3_por_m3?: number; // alias
+  agua_l_por_m3?: number;
+};
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 
-export default function ColumnaPage() {
+// — helper Unit para evitar errores de tipos —
+function normalizeUnit(u: string): Unit {
+  const s = (u || "").toLowerCase();
+  if (s === "m²" || s === "m2") return "m2";
+  if (s === "m³" || s === "m3") return "m3";
+  if (s === "kg") return "kg";
+  if (s === "l" || s === "lt" || s === "litros") return "l";
+  if (s === "m" || s === "metros") return "m";
+  return "u"; // bolsas, unidades, etc.
+}
+
+function ColumnaCalculator() {
+  const sp = useSearchParams();
+  const projectId = sp.get("projectId");
+  const partidaId = sp.get("partidaId");
+
   // JSONs
   const concrete = useJson<Record<string, ConcreteRow>>("/data/concrete_classes.json", {
     H21: { id: "H21", label: "H-21" },
@@ -62,6 +98,30 @@ export default function ColumnaPage() {
   const [s, setS] = useState(20);       // cm
   const [hook, setHook] = useState(10); // cm
 
+  // (C) Precarga si venimos por deep-link
+  useEffect(() => {
+    if (!projectId || !partidaId) return;
+    const p = getPartida(projectId, partidaId);
+    const inp = p?.inputs as any;
+    if (!inp) return;
+    if (typeof inp.H_m === "number") setH(inp.H_m);
+    if (typeof inp.b_cm === "number") setB(inp.b_cm);
+    if (typeof inp.h_cm === "number") setHsec(inp.h_cm);
+    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+
+    if (inp.vertical) {
+      setPhiV(inp.vertical.phi_mm ?? phiV);
+      setNV(inp.vertical.n ?? nV);
+    }
+    if (inp.stirrups) {
+      setPhiS(inp.stirrups.phi_mm ?? phiS);
+      setS(inp.stirrups.spacing_cm ?? s);
+      setHook(inp.stirrups.hook_cm ?? hook);
+    }
+  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Map rebar table
   const rebarMap = useMemo(() => {
     const m: Record<string, { kg_m?: number; label?: string }> = {};
@@ -82,14 +142,36 @@ export default function ColumnaPage() {
     stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
   });
 
+  // (B) Desglose de hormigón a partir de concrete_classes.json
+  const vol = (res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3) || 0;
+  const concreteRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const matBreakdown: Record<string, number> = {};
+  if (vol > 0 && concreteRow) {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    const bolsas = concreteRow.bolsas_cemento_por_m3 ?? concreteRow.cemento_bolsas_por_m3;
+    if (typeof bolsas === "number") matBreakdown.cemento_bolsas = round2(vol * bolsas);
+
+    if (typeof concreteRow.cemento_kg_por_m3 === "number")
+      matBreakdown.cemento_kg = round2(vol * concreteRow.cemento_kg_por_m3);
+
+    const arena = concreteRow.arena_m3_por_m3;
+    if (typeof arena === "number") matBreakdown.arena_m3 = round2(vol * arena);
+
+    const grava = concreteRow.grava_m3_por_m3 ?? concreteRow.piedra_m3_por_m3;
+    if (typeof grava === "number") matBreakdown.piedra_m3 = round2(vol * grava);
+
+    if (typeof concreteRow.agua_l_por_m3 === "number")
+      matBreakdown.agua_l = round2(vol * concreteRow.agua_l_por_m3);
+  }
+
   // Salida a tabla
   const rows: ResultRow[] = [];
   rows.push({ label: "Sección", qty: `${b}×${h}`, unit: "cm" as any });
   if (res?.dimensiones?.H_m != null) rows.push({ label: "Altura", qty: res.dimensiones.H_m, unit: "m" });
   if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
 
-  const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3;
-  if (vol != null) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (vol > 0) rows.push({ label: "Hormigón", qty: Math.round(vol * 100) / 100, unit: "m³", hint: "Con desperdicio" });
 
   if (res?.acero_total_kg != null) rows.push({ label: "Acero total", qty: res.acero_total_kg, unit: "kg" });
 
@@ -121,13 +203,15 @@ export default function ColumnaPage() {
     rows.push({ label: `Peso estribos Φ${St.phi_mm}`, qty: St.kg, unit: "kg" });
   }
 
-  // 👇 Ítems de proyecto (solo unidades válidas del Project: "m3", "kg")
-  const itemsForProject = useMemo(() => {
-    const out: { key?: string; label: string; qty: number; unit: string }[] = [];
-    if (!res) return out;
+  // volcamos desglose de materiales de hormigón
+  for (const [k, v] of Object.entries(matBreakdown)) {
+    rows.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
+  }
 
-    const vol = res.volumen_con_desperdicio_m3 ?? res.volumen_m3;
-    if (typeof vol === "number" && vol > 0) {
+  // Ítems de proyecto (MaterialRow[])
+  const itemsForProject: MaterialRow[] = useMemo(() => {
+    const out: MaterialRow[] = [];
+    if (vol > 0) {
       out.push({
         key: "hormigon_m3",
         label: `Hormigón ${concreteId}`,
@@ -135,8 +219,7 @@ export default function ColumnaPage() {
         unit: "m3",
       });
     }
-
-    if (typeof res.acero_total_kg === "number" && res.acero_total_kg > 0) {
+    if (typeof res?.acero_total_kg === "number" && res.acero_total_kg > 0) {
       out.push({
         key: "acero_total_kg",
         label: "Acero total",
@@ -144,11 +227,106 @@ export default function ColumnaPage() {
         unit: "kg",
       });
     }
-
+    for (const [k, v] of Object.entries(matBreakdown)) {
+      out.push({
+        key: k,
+        label: keyToLabel(k),
+        qty: Math.round((Number(v) || 0) * 100) / 100,
+        unit: normalizeUnit(keyToUnit(k) as any),
+      });
+    }
     return out;
-  }, [res, concreteId]);
+  }, [vol, res?.acero_total_kg, concreteId, JSON.stringify(matBreakdown)]);
 
   const defaultTitle = `Columna ${b}×${h} · H=${H} m`;
+
+  // (A) Lote local
+  type BatchItem = {
+    kind: "columna";
+    title: string;
+    materials: MaterialRow[];
+    inputs: any;
+    outputs: Record<string, any>;
+  };
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
+  const addCurrentToBatch = () => {
+    const inputs = {
+      H_m: H,
+      b_cm: b,
+      h_cm: h,
+      cover_cm: cover,
+      concreteClassId: concreteId,
+      wastePct: waste,
+      vertical: { phi_mm: phiV, n: nV },
+      stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
+    };
+    const item: BatchItem = {
+      kind: "columna",
+      title: defaultTitle,
+      materials: itemsForProject,
+      inputs,
+      outputs: res as any,
+    };
+    setBatch((prev) => {
+      if (editIndex !== null) {
+        const next = [...prev];
+        next[editIndex] = item;
+        return next;
+      }
+      return [...prev, item];
+    });
+    setEditIndex(null);
+  };
+
+  const handleEditFromBatch = (index: number) => {
+    const it = batch[index];
+    if (!it) return;
+    const inp = it.inputs || {};
+    setH(inp.H_m ?? H);
+    setB(inp.b_cm ?? b);
+    setHsec(inp.h_cm ?? h);
+    setCover(inp.cover_cm ?? cover);
+    setConcreteId(inp.concreteClassId ?? concreteId);
+    setWaste(inp.wastePct ?? waste);
+    if (inp.vertical) {
+      setPhiV(inp.vertical.phi_mm ?? phiV);
+      setNV(inp.vertical.n ?? nV);
+    }
+    if (inp.stirrups) {
+      setPhiS(inp.stirrups.phi_mm ?? phiS);
+      setS(inp.stirrups.spacing_cm ?? s);
+      setHook(inp.stirrups.hook_cm ?? hook);
+    }
+    setEditIndex(index);
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatch((prev) => prev.filter((_, i) => i !== index));
+    if (editIndex === index) setEditIndex(null);
+  };
+
+  // (C) Actualizar partida (si deep-link)
+  const handleUpdatePartida = () => {
+    if (!projectId || !partidaId) return;
+    updatePartida(projectId, partidaId, {
+      title: defaultTitle,
+      inputs: {
+        H_m: H,
+        b_cm: b,
+        h_cm: h,
+        cover_cm: cover,
+        concreteClassId: concreteId,
+        wastePct: waste,
+        vertical: { phi_mm: phiV, n: nV },
+        stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
+      },
+      outputs: res as any,
+      materials: itemsForProject,
+    });
+    alert("Partida actualizada.");
+  };
 
   return (
     <section className="space-y-6">
@@ -292,16 +470,82 @@ export default function ColumnaPage() {
         </div>
 
         {/* Resultado */}
-        <ResultTable title="Resultado" items={rows} />
+        <div className="card p-4 card--table">
+          <ResultTable title="Resultado" items={rows} />
+        </div>
       </div>
 
-      {/* 👇 Agregar al proyecto */}
+      {/* Botón actualizar cuando venimos por deep-link */}
+      {projectId && partidaId ? (
+        <div>
+          <button
+            type="button"
+            className="rounded border px-3 py-2"
+            onClick={handleUpdatePartida}
+          >
+            Actualizar partida
+          </button>
+        </div>
+      ) : null}
+
+      {/* Agregar al proyecto (unitario) */}
       <AddToProject
         kind="columna"
         defaultTitle={defaultTitle}
         items={itemsForProject}
         raw={res}
       />
+
+      {/* (A) Lote local */}
+      {batch.length > 0 && (
+        <div className="card p-4 space-y-3 mt-4">
+          <h2 className="font-medium">Lote local (Columna)</h2>
+          <BatchList
+            items={batch.map((b) => ({ title: b.title }))}
+            onEdit={handleEditFromBatch}
+            onRemove={handleRemoveFromBatch}
+          />
+          <AddToProjectBatch
+            items={batch.map((b) => ({
+              kind: b.kind,
+              title: b.title,
+              materials: b.materials,
+              inputs: b.inputs,
+              outputs: b.outputs,
+            }))}
+            onSaved={() => setBatch([])}
+          />
+          <div className="pt-2">
+            <button
+              type="button"
+              className="rounded border px-4 py-2"
+              onClick={addCurrentToBatch}
+              title={editIndex !== null ? "Guardar ítem del lote" : "Añadir columna al lote"}
+            >
+              {editIndex !== null ? "Guardar ítem del lote" : "Añadir columna al lote"}
+            </button>
+            {editIndex !== null && (
+              <button
+                type="button"
+                className="rounded border px-3 py-2 ml-2"
+                onClick={() => setEditIndex(null)}
+              >
+                Cancelar edición
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+// Este es el componente de página que se exporta por defecto.
+// Envuelve el calculador en <Suspense> para evitar el error de build.
+export default function ColumnaPage() {
+  return (
+    <Suspense fallback={<div>Cargando calculadora...</div>}>
+      <ColumnaCalculator />
+    </Suspense>
   );
 }

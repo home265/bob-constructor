@@ -1,15 +1,46 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, Suspense } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/viga";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import AddToProject from "@/components/ui/AddToProject";
+import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
+import BatchList from "@/components/ui/BatchList";
+import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
+import type { MaterialRow, Unit } from "@/lib/project/types";
+import { useSearchParams } from "next/navigation";
+import { getPartida, updatePartida } from "@/lib/project/storage";
 
-
-type ConcreteRow = { id?: string; label?: string };
+type ConcreteRow = {
+  id?: string;
+  label?: string;
+  bolsas_cemento_por_m3?: number;
+  cemento_bolsas_por_m3?: number;
+  cemento_kg_por_m3?: number;
+  arena_m3_por_m3?: number;
+  grava_m3_por_m3?: number;
+  piedra_m3_por_m3?: number;
+  agua_l_por_m3?: number;
+};
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 
-export default function VigaPage() {
+// Normalizador de unidad al tipo Unit del proyecto
+function normalizeUnit(u: string): Unit {
+  const s = (u || "").toLowerCase();
+  if (s === "m²" || s === "m2") return "m2";
+  if (s === "m³" || s === "m3") return "m3";
+  if (s === "kg") return "kg";
+  if (s === "l" || s === "lt" || s === "litros") return "l";
+  if (s === "m") return "m";
+  return "u";
+}
+
+function VigaCalculator() {
+  // Deep-link (C)
+  const sp = useSearchParams();
+  const projectId = sp.get("projectId");
+  const partidaId = sp.get("partidaId");
+
   // JSONs
   const concrete = useJson<Record<string, ConcreteRow>>("/data/concrete_classes.json", {
     H21: { id: "H21", label: "H-21" },
@@ -27,10 +58,11 @@ export default function VigaPage() {
 
   // Opciones normalizadas
   const concreteOpts = useMemo(
-    () => Object.values(concrete ?? {}).map((r, i) => ({
-      key: r?.id ?? `c${i}`,
-      label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
-    })),
+    () =>
+      Object.values(concrete ?? {}).map((r, i) => ({
+        key: r?.id ?? `c${i}`,
+        label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
+      })),
     [concrete]
   );
 
@@ -71,6 +103,31 @@ export default function VigaPage() {
     return m;
   }, [rebarOpts]);
 
+  // Precargar desde deep-link (C)
+  useEffect(() => {
+    if (!projectId || !partidaId) return;
+    const p = getPartida(projectId, partidaId);
+    const inp = p?.inputs as any;
+    if (!inp) return;
+    if (typeof inp.L_m === "number") setL(inp.L_m);
+    if (typeof inp.b_cm === "number") setB(inp.b_cm);
+    if (typeof inp.h_cm === "number") setH(inp.h_cm);
+    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+    if (inp.long) {
+      if (typeof inp.long.phi_mm === "number") setPhiLong(inp.long.phi_mm);
+      if (typeof inp.long.n_sup === "number") setNSup(inp.long.n_sup);
+      if (typeof inp.long.n_inf === "number") setNInf(inp.long.n_inf);
+      if (typeof inp.long.n_extra === "number") setNExt(inp.long.n_extra);
+    }
+    if (inp.stirrups) {
+      if (typeof inp.stirrups.phi_mm === "number") setPhiSt(inp.stirrups.phi_mm);
+      if (typeof inp.stirrups.spacing_cm === "number") setS(inp.stirrups.spacing_cm);
+      if (typeof inp.stirrups.hook_cm === "number") setHook(inp.stirrups.hook_cm);
+    }
+  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Cálculo
   const res = C.calcViga({
     L_m: L,
@@ -93,18 +150,35 @@ export default function VigaPage() {
     },
   });
 
+  // (B) Desglose opcional de hormigón según JSON
+  const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3 ?? 0;
+  const concRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concBreakdown: Record<string, number> = {};
+  if (vol > 0 && concRow) {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const bolsas = concRow.bolsas_cemento_por_m3 ?? concRow.cemento_bolsas_por_m3;
+    if (typeof bolsas === "number") concBreakdown.cemento_bolsas = round2(vol * bolsas);
+    if (typeof concRow.cemento_kg_por_m3 === "number")
+      concBreakdown.cemento_kg = round2(vol * concRow.cemento_kg_por_m3);
+    if (typeof concRow.arena_m3_por_m3 === "number")
+      concBreakdown.arena_m3 = round2(vol * concRow.arena_m3_por_m3);
+    const grava = concRow.grava_m3_por_m3 ?? concRow.piedra_m3_por_m3;
+    if (typeof grava === "number") concBreakdown.piedra_m3 = round2(vol * grava);
+    if (typeof concRow.agua_l_por_m3 === "number")
+      concBreakdown.agua_l = round2(vol * concRow.agua_l_por_m3);
+  }
+
   // Salida (tabla)
   const rows: ResultRow[] = [];
   rows.push({
     label: "Sección",
-    qty: res?.dimensiones ? `${res.dimensiones.b_cm}×${res.dimensiones.h_cm}` as any : "",
+    qty: res?.dimensiones ? (`${res.dimensiones.b_cm}×${res.dimensiones.h_cm}` as any) : "",
     unit: "cm",
   });
   if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
   if (res?.dimensiones?.L_m != null) rows.push({ label: "Largo", qty: res.dimensiones.L_m, unit: "m" });
 
-  const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3;
-  if (vol != null) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (vol > 0) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
 
   if (res?.acero_total_kg != null) rows.push({ label: "Acero total", qty: res.acero_total_kg, unit: "kg" });
 
@@ -136,31 +210,141 @@ export default function VigaPage() {
     rows.push({ label: `Peso estribos Φ${St.phi_mm}`, qty: St.kg, unit: "kg" });
   }
 
-  // Ítems para proyecto (materiales unificables)
-  const itemsForProject: { key?: string; label: string; qty: number; unit: string }[] = [];
-  const volProj = Number(vol) || 0;
-  if (volProj > 0) {
-    itemsForProject.push({
-      key: "hormigon_simple",
-      label: "Hormigón",
-      qty: volProj,
-      unit: "m3",
-    });
-  }
-  // Acero: uso total si existe; si no, sumo partes
-  const kgLong = Number(res?.longitudinal?.kg) || 0;
-  const kgSt   = Number(res?.estribos?.kg) || 0;
-  const kgTotal = Number(res?.acero_total_kg ?? (kgLong + kgSt)) || 0;
-  if (kgTotal > 0) {
-    itemsForProject.push({
-      key: "acero_corrugado",
-      label: "Acero corrugado",
-      qty: kgTotal,
-      unit: "kg",
-    });
+  // Añadir desglose de hormigón a la tabla (si existe)
+  for (const [k, v] of Object.entries(concBreakdown)) {
+    rows.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
   }
 
+  // Ítems para proyecto (materiales unificables, con Unit válido)
+  const itemsForProject: MaterialRow[] = useMemo(() => {
+    const out: MaterialRow[] = [];
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    if (vol > 0) {
+      out.push({
+        key: "hormigon_simple",
+        label: `Hormigón ${concreteId}`,
+        qty: round2(vol),
+        unit: "m3",
+      });
+    }
+
+    // Acero: uso total si existe; si no, sumo partes
+    const kgLong = Number(res?.longitudinal?.kg) || 0;
+    const kgSt   = Number(res?.estribos?.kg) || 0;
+    const kgTotal = Number(res?.acero_total_kg ?? (kgLong + kgSt)) || 0;
+    if (kgTotal > 0) {
+      out.push({
+        key: "acero_corrugado",
+        label: "Acero corrugado",
+        qty: round2(kgTotal),
+        unit: "kg",
+      });
+    }
+
+    for (const [k, v] of Object.entries(concBreakdown)) {
+      out.push({
+        key: k,
+        label: keyToLabel(k),
+        qty: round2(Number(v) || 0),
+        unit: normalizeUnit(keyToUnit(k) as any),
+      });
+    }
+
+    return out;
+  }, [vol, res?.longitudinal?.kg, res?.estribos?.kg, res?.acero_total_kg, concreteId, JSON.stringify(concBreakdown)]);
+
   const defaultTitle = `Viga ${b}×${h} · L=${L} m`;
+
+  // (A) Lote local
+  type BatchItem = {
+    kind: "viga";
+    title: string;
+    materials: MaterialRow[];
+    inputs: any;
+    outputs: Record<string, any>;
+  };
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
+  const addCurrentToBatch = () => {
+    const inputs = {
+      L_m: L,
+      b_cm: b,
+      h_cm: h,
+      cover_cm: cover,
+      concreteClassId: concreteId,
+      wastePct: waste,
+      long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
+      stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
+    };
+    const item: BatchItem = {
+      kind: "viga",
+      title: defaultTitle,
+      materials: itemsForProject,
+      inputs,
+      outputs: res as any,
+    };
+    setBatch((prev) => {
+      if (editIndex !== null) {
+        const next = [...prev];
+        next[editIndex] = item;
+        return next;
+      }
+      return [...prev, item];
+    });
+    setEditIndex(null);
+  };
+
+  const handleEditFromBatch = (index: number) => {
+    const it = batch[index];
+    if (!it) return;
+    const inp = it.inputs || {};
+    setL(inp.L_m ?? L);
+    setB(inp.b_cm ?? b);
+    setH(inp.h_cm ?? h);
+    setCover(inp.cover_cm ?? cover);
+    setConcreteId(inp.concreteClassId ?? concreteId);
+    setWaste(inp.wastePct ?? waste);
+    if (inp.long) {
+      setPhiLong(inp.long.phi_mm ?? phiLong);
+      setNSup(inp.long.n_sup ?? nSup);
+      setNInf(inp.long.n_inf ?? nInf);
+      setNExt(inp.long.n_extra ?? nExt);
+    }
+    if (inp.stirrups) {
+      setPhiSt(inp.stirrups.phi_mm ?? phiSt);
+      setS(inp.stirrups.spacing_cm ?? s);
+      setHook(inp.stirrups.hook_cm ?? hook);
+    }
+    setEditIndex(index);
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatch((prev) => prev.filter((_, i) => i !== index));
+    if (editIndex === index) setEditIndex(null);
+  };
+
+  // (C) Actualizar partida (deep-link)
+  const handleUpdatePartida = () => {
+    if (!projectId || !partidaId) return;
+    updatePartida(projectId, partidaId, {
+      title: defaultTitle,
+      inputs: {
+        L_m: L,
+        b_cm: b,
+        h_cm: h,
+        cover_cm: cover,
+        concreteClassId: concreteId,
+        wastePct: waste,
+        long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
+        stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
+      },
+      outputs: res as any,
+      materials: itemsForProject,
+    });
+    alert("Partida actualizada.");
+  };
 
   return (
     <section className="space-y-6">
@@ -325,18 +509,81 @@ export default function VigaPage() {
         <ResultTable title="Resultado" items={rows} />
       </div>
 
-      {/* Agregar al proyecto */}
+      {/* Deep-link: actualizar partida */}
+      {projectId && partidaId ? (
+        <div>
+          <button type="button" className="rounded border px-3 py-2" onClick={handleUpdatePartida}>
+            Actualizar partida
+          </button>
+        </div>
+      ) : null}
+
+      {/* Agregar al proyecto (unidad) */}
       <AddToProject
         kind="viga"
         defaultTitle={defaultTitle}
         items={itemsForProject}
-        raw={{ input: {
-          L_m: L, b_cm: b, h_cm: h, cover_cm: cover, concreteClassId: concreteId,
-          wastePct: waste,
-          long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
-          stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
-        }, result: res }}
+        raw={{
+          input: {
+            L_m: L,
+            b_cm: b,
+            h_cm: h,
+            cover_cm: cover,
+            concreteClassId: concreteId,
+            wastePct: waste,
+            long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
+            stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
+          },
+          result: res,
+        }}
       />
+
+      {/* (A) Lote local */}
+      {batch.length > 0 && (
+        <div className="card p-4 space-y-3">
+          <h2 className="font-medium">Lote local (Viga)</h2>
+          <BatchList
+            items={batch.map((b) => ({ title: b.title }))}
+            onEdit={handleEditFromBatch}
+            onRemove={handleRemoveFromBatch}
+          />
+          <AddToProjectBatch
+            items={batch.map((b) => ({
+              kind: b.kind,
+              title: b.title,
+              materials: b.materials,
+              inputs: b.inputs,
+              outputs: b.outputs,
+            }))}
+            onSaved={() => setBatch([])}
+          />
+          <div className="pt-2">
+            <button
+              type="button"
+              className="rounded border px-4 py-2"
+              onClick={addCurrentToBatch}
+              title={editIndex !== null ? "Guardar ítem del lote" : "Añadir viga al lote"}
+            >
+              {editIndex !== null ? "Guardar ítem del lote" : "Añadir viga al lote"}
+            </button>
+            {editIndex !== null && (
+              <button type="button" className="rounded border px-3 py-2 ml-2" onClick={() => setEditIndex(null)}>
+                Cancelar edición
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+// Este es el componente de página que se exporta por defecto.
+// Envuelve el calculador en <Suspense> para evitar el error de build.
+export default function VigaPage() {
+  return (
+    <Suspense fallback={<div>Cargando calculadora...</div>}>
+      <VigaCalculator />
+    </Suspense>
   );
 }

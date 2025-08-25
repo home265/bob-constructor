@@ -1,3 +1,4 @@
+// lib/calc/revestimientos.ts
 import { round2 } from "./rc";
 
 export type RevestInput = {
@@ -7,11 +8,12 @@ export type RevestInput = {
   pieza_cm: { LP: number; AP: number }; // tamaño de pieza
   junta_mm: number;
   wastePct?: number;
-  coeffs?: Record<string, any>; // puede traer m2_por_caja o pzas_por_caja
+  coeffs?: Record<string, any>;  // puede traer m2_por_caja o pzas_por_caja
   pastina?: Record<string, any>; // puede traer kg_por_m2 por junta u otros
 };
 
 export type RevestResult = {
+  materiales?: Record<string, number>; // opcional (desglose si existiera)
   area_m2: number;
   modulo_m2: number;             // módulo pieza+junta
   piezas_necesarias: number;
@@ -33,6 +35,7 @@ export function calcRevestimientos(input: RevestInput): RevestResult {
   const piezasW = Math.ceil(piezas * (1 + wastePct / 100));
 
   const res: RevestResult = {
+    materiales: {}, // por ahora sin desglose
     area_m2: round2(area),
     modulo_m2: round2(modulo_m2),
     piezas_necesarias: piezas,
@@ -53,7 +56,7 @@ export function calcRevestimientos(input: RevestInput): RevestResult {
 
   // Pastina (si hay info): kg por m2 según junta
   if (pastina) {
-    let kg_m2: number | undefined =
+    const kg_m2: number | undefined =
       pastina.kg_por_m2?.[String(junta_mm)] ??
       pastina.kg_por_m2_default ??
       pastina.kg_m2;

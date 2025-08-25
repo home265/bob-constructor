@@ -1,16 +1,47 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, Suspense } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/losa";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import AddToProject from "@/components/ui/AddToProject";
- // 👈 NUEVO
+import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
+import BatchList from "@/components/ui/BatchList";
+import type { MaterialRow, Unit } from "@/lib/project/types";
+import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
+import { useSearchParams } from "next/navigation";
+import { getPartida, updatePartida } from "@/lib/project/storage";
 
-type ConcreteRow = { id?: string; label?: string };
+type ConcreteRow = {
+  id?: string;
+  label?: string;
+  bolsas_cemento_por_m3?: number;
+  cemento_bolsas_por_m3?: number;
+  cemento_kg_por_m3?: number;
+  arena_m3_por_m3?: number;
+  grava_m3_por_m3?: number;
+  piedra_m3_por_m3?: number;
+  agua_l_por_m3?: number;
+};
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 type MeshRow = { id?: string; label?: string; kg_m2?: number };
 
-export default function LosaPage() {
+// helper Unit para Project
+function normalizeUnit(u: string): Unit {
+  const s = (u || "").toLowerCase();
+  if (s === "m²" || s === "m2") return "m2";
+  if (s === "m³" || s === "m3") return "m3";
+  if (s === "kg") return "kg";
+  if (s === "l" || s === "lt" || s === "litros") return "l";
+  if (s === "m" || s === "metros") return "m";
+  return "u";
+}
+
+// Componente principal que contiene toda la lógica del cliente
+function LosaCalculator() {
+  const sp = useSearchParams();
+  const projectId = sp.get("projectId");
+  const partidaId = sp.get("partidaId");
+
   // JSONs
   const concrete = useJson<Record<string, ConcreteRow>>("/data/concrete_classes.json", {
     H21: { id: "H21", label: "H-21" },
@@ -74,6 +105,33 @@ export default function LosaPage() {
   const [sY, setSY] = useState(20); // cm
   const [doubleLayer, setDoubleLayer] = useState(false);
 
+  // (C) Precarga si venimos por deep-link
+  useEffect(() => {
+    if (!projectId || !partidaId) return;
+    const p = getPartida(projectId, partidaId);
+    const inp = p?.inputs as any;
+    if (!inp) return;
+    if (typeof inp.Lx_m === "number") setLx(inp.Lx_m);
+    if (typeof inp.Ly_m === "number") setLy(inp.Ly_m);
+    if (typeof inp.H_cm === "number") setH(inp.H_cm);
+    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+    if (typeof inp.mallaId === "string") {
+      setUseMesh(!!inp.mallaId);
+      setMeshId(inp.mallaId);
+    }
+    if (typeof inp.meshDoubleLayer === "boolean") setMeshDoubleLayer(inp.meshDoubleLayer);
+    if (inp.bars) {
+      setUseMesh(false);
+      setPhiX(inp.bars.phi_x_mm ?? phiX);
+      setSX(inp.bars.spacing_x_cm ?? sX);
+      setPhiY(inp.bars.phi_y_mm ?? phiY);
+      setSY(inp.bars.spacing_y_cm ?? sY);
+      setDoubleLayer(inp.bars.doubleLayer ?? doubleLayer);
+    }
+  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const rebarMap = useMemo(() => {
     const m: Record<string, { kg_m?: number; label?: string }> = {};
     rebarOpts.forEach((r) => (m[String(r.phi_mm)] = { kg_m: r.kg_m, label: r.label }));
@@ -108,16 +166,33 @@ export default function LosaPage() {
     rebarTable: rebarMap,
   });
 
-  // Tabla de resultado (sin cambios)
+  // (B) Desglose hormigón según concrete_classes.json
+  const vol = (res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3) || 0;
+  const concreteRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const matBreakdown: Record<string, number> = {};
+  if (vol > 0 && concreteRow) {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const bolsas = concreteRow.bolsas_cemento_por_m3 ?? concreteRow.cemento_bolsas_por_m3;
+    if (typeof bolsas === "number") matBreakdown.cemento_bolsas = round2(vol * bolsas);
+    if (typeof concreteRow.cemento_kg_por_m3 === "number")
+      matBreakdown.cemento_kg = round2(vol * concreteRow.cemento_kg_por_m3);
+    const arena = concreteRow.arena_m3_por_m3;
+    if (typeof arena === "number") matBreakdown.arena_m3 = round2(vol * arena);
+    const grava = concreteRow.grava_m3_por_m3 ?? concreteRow.piedra_m3_por_m3;
+    if (typeof grava === "number") matBreakdown.piedra_m3 = round2(vol * grava);
+    if (typeof concreteRow.agua_l_por_m3 === "number")
+      matBreakdown.agua_l = round2(vol * concreteRow.agua_l_por_m3);
+  }
+
+  // Tabla de resultado
   const rows: ResultRow[] = [];
   rows.push({ label: "Área", qty: res?.area_m2 ?? 0, unit: "m²" });
   rows.push({ label: "Espesor", qty: res?.espesor_cm ?? 0, unit: "cm" });
-  const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3;
-  if (vol != null) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (vol > 0) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
 
   if (res?.modo === "malla" && res?.malla_kg != null) {
     rows.push({
-      label: `Malla ${res.malla_id}`,
+      label: `Malla ${res.malla_id ?? ""}`,
       qty: res.malla_kg,
       unit: "kg",
       hint: meshDoubleLayer ? "2 capas" : "1 capa",
@@ -152,46 +227,160 @@ export default function LosaPage() {
     }
   }
 
-  // 👇 Ítems para "Agregar al proyecto": solo m3 y kg (compatibles con Unit)
-  const itemsForProject = useMemo(
-    (): { key?: string; label: string; qty: number; unit: string }[] => {
-      const out: { key?: string; label: string; qty: number; unit: string }[] = [];
-      if (!res) return out;
+  // volcamos desglose de materiales del hormigón
+  for (const [k, v] of Object.entries(matBreakdown)) {
+    rows.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
+  }
 
-      const vol = res.volumen_con_desperdicio_m3 ?? res.volumen_m3;
-      if (typeof vol === "number" && vol > 0) {
-        out.push({
-          key: "hormigon_m3",
-          label: `Hormigón ${concreteId}`,
-          qty: Math.round(vol * 100) / 100,
-          unit: "m3",
-        });
-      }
-
-      if (res.modo === "malla" && typeof res.malla_kg === "number" && res.malla_kg > 0) {
-        out.push({
-          key: `malla_${res.malla_id ?? "sima"}`,
-          label: `Malla ${res.malla_id}${meshDoubleLayer ? " (2 capas)" : ""}`,
-          qty: Math.round(res.malla_kg * 100) / 100,
-          unit: "kg",
-        });
-      }
-
-      if (res.modo === "barras" && res.barras && typeof res.barras.acero_kg === "number" && res.barras.acero_kg > 0) {
-        out.push({
-          key: "acero_total_kg",
-          label: "Acero total",
-          qty: Math.round(res.barras.acero_kg * 100) / 100,
-          unit: "kg",
-        });
-      }
-
-      return out;
-    },
-    [res, concreteId, meshDoubleLayer]
-  );
+  // Ítems para "Agregar al proyecto"
+  const itemsForProject: MaterialRow[] = useMemo(() => {
+    const out: MaterialRow[] = [];
+    if (vol > 0) {
+      out.push({
+        key: "hormigon_m3",
+        label: `Hormigón ${concreteId}`,
+        qty: Math.round(vol * 100) / 100,
+        unit: "m3",
+      });
+    }
+    if (res?.modo === "malla" && typeof res?.malla_kg === "number" && res.malla_kg > 0) {
+      out.push({
+        key: `malla_${res.malla_id ?? "sima"}`,
+        label: `Malla ${res.malla_id}${meshDoubleLayer ? " (2 capas)" : ""}`,
+        qty: Math.round(res.malla_kg * 100) / 100,
+        unit: "kg",
+      });
+    }
+    if (res?.modo === "barras" && typeof res?.barras?.acero_kg === "number" && res.barras.acero_kg > 0) {
+      out.push({
+        key: "acero_total_kg",
+        label: "Acero total",
+        qty: Math.round(res.barras.acero_kg * 100) / 100,
+        unit: "kg",
+      });
+    }
+    for (const [k, v] of Object.entries(matBreakdown)) {
+      out.push({
+        key: k,
+        label: keyToLabel(k),
+        qty: Math.round((Number(v) || 0) * 100) / 100,
+        unit: normalizeUnit(keyToUnit(k) as any),
+      });
+    }
+    return out;
+  }, [vol, res?.modo, res?.malla_kg, res?.barras?.acero_kg, concreteId, meshDoubleLayer, JSON.stringify(matBreakdown)]);
 
   const defaultTitle = `Losa ${Lx}×${Ly} · e=${H} cm`;
+
+  // (A) Lote local
+  type BatchItem = {
+    kind: "losa";
+    title: string;
+    materials: MaterialRow[];
+    inputs: any;
+    outputs: Record<string, any>;
+  };
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
+  const addCurrentToBatch = () => {
+    const inputs = {
+      Lx_m: Lx,
+      Ly_m: Ly,
+      H_cm: H,
+      cover_cm: cover,
+      concreteClassId: concreteId,
+      wastePct: waste,
+      mallaId: useMesh ? meshId : "",
+      meshDoubleLayer,
+      bars: useMesh
+        ? undefined
+        : {
+            phi_x_mm: phiX,
+            spacing_x_cm: sX,
+            phi_y_mm: phiY,
+            spacing_y_cm: sY,
+            doubleLayer,
+          },
+    };
+    const item: BatchItem = {
+      kind: "losa",
+      title: defaultTitle,
+      materials: itemsForProject,
+      inputs,
+      outputs: res as any,
+    };
+    setBatch((prev) => {
+      if (editIndex !== null) {
+        const next = [...prev];
+        next[editIndex] = item;
+        return next;
+      }
+      return [...prev, item];
+    });
+    setEditIndex(null);
+  };
+
+  const handleEditFromBatch = (index: number) => {
+    const it = batch[index];
+    if (!it) return;
+    const inp = it.inputs || {};
+    setLx(inp.Lx_m ?? Lx);
+    setLy(inp.Ly_m ?? Ly);
+    setH(inp.H_cm ?? H);
+    setCover(inp.cover_cm ?? cover);
+    setConcreteId(inp.concreteClassId ?? concreteId);
+    setWaste(inp.wastePct ?? waste);
+
+    const hasMesh = typeof inp.mallaId === "string" && inp.mallaId !== "";
+    setUseMesh(hasMesh);
+    if (hasMesh) {
+      setMeshId(inp.mallaId);
+      setMeshDoubleLayer(!!inp.meshDoubleLayer);
+    } else if (inp.bars) {
+      setPhiX(inp.bars.phi_x_mm ?? phiX);
+      setSX(inp.bars.spacing_x_cm ?? sX);
+      setPhiY(inp.bars.phi_y_mm ?? phiY);
+      setSY(inp.bars.spacing_y_cm ?? sY);
+      setDoubleLayer(!!inp.bars.doubleLayer);
+    }
+    setEditIndex(index);
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatch((prev) => prev.filter((_, i) => i !== index));
+    if (editIndex === index) setEditIndex(null);
+  };
+
+  // (C) Actualizar partida (si deep-link)
+  const handleUpdatePartida = () => {
+    if (!projectId || !partidaId) return;
+    updatePartida(projectId, partidaId, {
+      title: defaultTitle,
+      inputs: {
+        Lx_m: Lx,
+        Ly_m: Ly,
+        H_cm: H,
+        cover_cm: cover,
+        concreteClassId: concreteId,
+        wastePct: waste,
+        mallaId: useMesh ? meshId : "",
+        meshDoubleLayer,
+        bars: useMesh
+          ? undefined
+          : {
+              phi_x_mm: phiX,
+              spacing_x_cm: sX,
+              phi_y_mm: phiY,
+              spacing_y_cm: sY,
+              doubleLayer,
+            },
+      },
+      outputs: res as any,
+      materials: itemsForProject,
+    });
+    alert("Partida actualizada.");
+  };
 
   return (
     <section className="space-y-6">
@@ -303,16 +492,73 @@ export default function LosaPage() {
         </div>
 
         {/* Resultado */}
-        <ResultTable title="Resultado" items={rows} />
+        <div className="card p-4 card--table">
+          <ResultTable title="Resultado" items={rows} />
+        </div>
       </div>
 
-      {/* 👇 Agregar al proyecto */}
-      <AddToProject
-        kind="losa"
-        defaultTitle={defaultTitle}
-        items={itemsForProject}
-        raw={res}
-      />
+      {/* Botón actualizar cuando venimos por deep-link */}
+      {projectId && partidaId ? (
+        <div>
+          <button type="button" className="rounded border px-3 py-2" onClick={handleUpdatePartida}>
+            Actualizar partida
+          </button>
+        </div>
+      ) : null}
+
+      {/* Agregar al proyecto (unitario) */}
+      <AddToProject kind="losa" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+
+      {/* (A) Lote local */}
+      {batch.length > 0 && (
+        <div className="card p-4 space-y-3 mt-4">
+          <h2 className="font-medium">Lote local (Losa)</h2>
+          <BatchList
+            items={batch.map((b) => ({ title: b.title }))}
+            onEdit={handleEditFromBatch}
+            onRemove={handleRemoveFromBatch}
+          />
+          <AddToProjectBatch
+            items={batch.map((b) => ({
+              kind: b.kind,
+              title: b.title,
+              materials: b.materials,
+              inputs: b.inputs,
+              outputs: b.outputs,
+            }))}
+            onSaved={() => setBatch([])}
+          />
+          <div className="pt-2">
+            <button
+              type="button"
+              className="rounded border px-4 py-2"
+              onClick={addCurrentToBatch}
+              title={editIndex !== null ? "Guardar ítem del lote" : "Añadir losa al lote"}
+            >
+              {editIndex !== null ? "Guardar ítem del lote" : "Añadir losa al lote"}
+            </button>
+            {editIndex !== null && (
+              <button
+                type="button"
+                className="rounded border px-3 py-2 ml-2"
+                onClick={() => setEditIndex(null)}
+              >
+                Cancelar edición
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+// Este es el componente de página que se exporta por defecto.
+// Envuelve el calculador en <Suspense> para evitar el error de build.
+export default function LosaPage() {
+  return (
+    <Suspense fallback={<div>Cargando calculadora...</div>}>
+      <LosaCalculator />
+    </Suspense>
   );
 }

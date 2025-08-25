@@ -1,15 +1,15 @@
 // components/inputs/NumberWithUnit.tsx
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type Props = {
   label: string;
   name: string;
   unit?: string;
   value: number | string;
-  onChange: (v: number) => void;   // sigue igual
+  onChange: (v: number) => void;
   step?: number;
-  min?: number;
+  min?: number; // por defecto 0 = no negativos
 };
 
 export default function NumberWithUnit({
@@ -21,25 +21,41 @@ export default function NumberWithUnit({
   step = 0.01,
   min = 0,
 }: Props) {
-  // Estado local "raw" para permitir vacío durante la edición
+  // estado local para permitir vacío
   const [raw, setRaw] = useState<string>(value === 0 ? "0" : String(value ?? ""));
 
-  // Sincronizar cuando el prop externo cambie (p.ej. reset de form)
+  // regex depende de si se permiten negativos o no
+  const reInput = useMemo(
+    () => (min < 0 ? /^-?\d*(?:[.,]\d*)?$/ : /^\d*(?:[.,]\d*)?$/),
+    [min]
+  );
+
+  // sync cuando cambia value externo
   useEffect(() => {
     const next = value === 0 ? "0" : String(value ?? "");
-    // Evita sobrescribir mientras el usuario está escribiendo lo mismo
     if (next !== raw) setRaw(next);
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
-  // Normalizador a número
   const toNumber = (s: string) => {
     if (s.trim() === "") return NaN;
     return parseFloat(s.replace(",", "."));
   };
 
+  // Redondeo opcional al step (simple)
+  const roundToStep = (n: number) => {
+    if (!step || step <= 0) return n;
+    const inv = 1 / step;
+    return Math.round(n * inv) / inv;
+  };
+
   const commit = () => {
-    const n = toNumber(raw);
-    const val = Number.isFinite(n) ? n : 0;
+    let n = toNumber(raw);
+    // si no es número, caer al valor externo (o 0)
+    if (!Number.isFinite(n)) n = typeof value === "number" ? value : 0;
+    // clamping al mínimo
+    if (typeof min === "number" && n < min) n = min;
+    const val = roundToStep(n);
     onChange(val);
     setRaw(String(val)); // normaliza visualmente
   };
@@ -54,26 +70,33 @@ export default function NumberWithUnit({
     }
   };
 
+  const liveNumber = toNumber(raw);
+  const isLiveBelowMin = Number.isFinite(liveNumber) && typeof min === "number" && liveNumber < min;
+
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="font-medium">{label}</span>
       <div className="flex items-center gap-2">
         <input
           name={name}
-          type="text"              // ← importante: permite vacío sin pelearse con el control
+          type="text"              // permite vacío sin pelearse con el control
           inputMode="decimal"
           className="w-40 rounded border px-3 py-2"
           step={step}
           min={min}
           value={raw}
+          aria-invalid={isLiveBelowMin || undefined}
+          title={isLiveBelowMin ? `Mínimo: ${min}` : undefined}
           onChange={(e) => {
-            // Permitimos dígitos, coma/punto y vacío mientras escribe
             const v = e.target.value;
-            if (/^-?\d*(?:[.,]\d*)?$/.test(v) || v === "") {
+            // Permitimos dígitos y coma/punto; si min>=0, bloquea "-"
+            if (reInput.test(v) || v === "") {
               setRaw(v);
-              // Si ya es número válido, podemos avisar en vivo; si está vacío, no
+              // si ya es número válido y no viola min, avisamos en vivo
               const n = toNumber(v);
-              if (Number.isFinite(n)) onChange(n);
+              if (Number.isFinite(n) && !(typeof min === "number" && n < min)) {
+                onChange(n);
+              }
             }
           }}
           onBlur={commit}

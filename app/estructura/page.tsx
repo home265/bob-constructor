@@ -1,8 +1,12 @@
 "use client";
 
+import { useMemo, useState, useEffect, Suspense } from "react";
 import AddToProject from "@/components/ui/AddToProject";
-import { useMemo, useState } from "react";
-
+import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
+import BatchList from "@/components/ui/BatchList";
+import type { MaterialRow } from "@/lib/project/types";
+import { useSearchParams } from "next/navigation";
+import { getPartida, updatePartida } from "@/lib/project/storage";
 
 type OpcionUso = { key: string; q_kN_m2: number; label: string };
 type OpcionTecho = { key: string; g_kN_m2: number; label: string };
@@ -21,7 +25,12 @@ const TECHOS: OpcionTecho[] = [
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export default function EstructuraPage() {
+function EstructuraCalculator() {
+  // Deep-link (C)
+  const sp = useSearchParams();
+  const projectId = sp.get("projectId");
+  const partidaId = sp.get("partidaId");
+
   // Geometría
   const [Lx, setLx] = useState(10);
   const [Ly, setLy] = useState(8);
@@ -36,6 +45,23 @@ export default function EstructuraPage() {
   // Uso / techo
   const [usoKey, setUsoKey] = useState<OpcionUso["key"]>("vivienda");
   const [techoKey, setTechoKey] = useState<OpcionTecho["key"]>("losa10");
+
+  // Precargar desde partida (C)
+  useEffect(() => {
+    if (!projectId || !partidaId) return;
+    const p = getPartida(projectId, partidaId);
+    const inp = (p?.inputs ?? {}) as any;
+    if (!inp) return;
+    if (typeof inp.Lx === "number") setLx(inp.Lx);
+    if (typeof inp.Ly === "number") setLy(inp.Ly);
+    if (typeof inp.nx === "number") setNx(inp.nx);
+    if (typeof inp.ny === "number") setNy(inp.ny);
+    if (typeof inp.plantas === "number") setPlantas(inp.plantas);
+    if (typeof inp.espLosa_cm === "number") setEspLosa(inp.espLosa_cm);
+    if (typeof inp.gAcabados === "number") setGAcabados(inp.gAcabados);
+    if (typeof inp.usoKey === "string") setUsoKey(inp.usoKey);
+    if (typeof inp.techoKey === "string") setTechoKey(inp.techoKey);
+  }, [projectId, partidaId]);
 
   // Derivados
   const spanX = useMemo(() => (nx > 0 ? Lx / nx : 0), [Lx, nx]);
@@ -80,19 +106,20 @@ export default function EstructuraPage() {
 
   const sugCol = suggestCol(N_int);
 
-  // ---- Agregar al proyecto ----
+  // ---- Agregar al proyecto (items como MaterialRow, unit "u") ----
+  const itemsForProject = useMemo<MaterialRow[]>(() => ([
+    { key: "viga_x_w_piso", label: "Viga X — w piso (kN/m)", qty: wX_piso, unit: "u" },
+    { key: "viga_x_m_piso", label: "Viga X — M piso (kN·m)", qty: Mx_piso, unit: "u" },
+    { key: "viga_x_v_piso", label: "Viga X — V piso (kN)",   qty: Vx_piso, unit: "u" },
+    { key: "viga_y_w_piso", label: "Viga Y — w piso (kN/m)", qty: wY_piso, unit: "u" },
+    { key: "viga_y_m_piso", label: "Viga Y — M piso (kN·m)", qty: My_piso, unit: "u" },
+    { key: "viga_y_v_piso", label: "Viga Y — V piso (kN)",   qty: Vy_piso, unit: "u" },
+    { key: "col_int_n",     label: "Columna interior — N (kN)", qty: N_int, unit: "u" },
+    { key: "col_borde_n",   label: "Columna borde — N (kN)",    qty: N_bor, unit: "u" },
+    { key: "col_esq_n",     label: "Columna esquina — N (kN)",  qty: N_esq, unit: "u" },
+  ]), [wX_piso, Mx_piso, Vx_piso, wY_piso, My_piso, Vy_piso, N_int, N_bor, N_esq]);
+
   const defaultTitle = `Boceto ${Lx}×${Ly} m · grilla ${nx}×${ny} · ${plantas} plantas`;
-  const items = [
-    { label: `Viga X — w piso (kN/m)`, qty: wX_piso, unit: "u" },
-    { label: `Viga X — M piso (kN·m)`, qty: Mx_piso, unit: "u" },
-    { label: `Viga X — V piso (kN)`,   qty: Vx_piso, unit: "u" },
-    { label: `Viga Y — w piso (kN/m)`, qty: wY_piso, unit: "u" },
-    { label: `Viga Y — M piso (kN·m)`, qty: My_piso, unit: "u" },
-    { label: `Viga Y — V piso (kN)`,   qty: Vy_piso, unit: "u" },
-    { label: `Columna interior — N (kN)`, qty: N_int, unit: "u" },
-    { label: `Columna borde — N (kN)`,    qty: N_bor, unit: "u" },
-    { label: `Columna esquina — N (kN)`,  qty: N_esq, unit: "u" },
-  ];
 
   const raw = {
     Lx, Ly, nx, ny, plantas, usoKey, techoKey,
@@ -102,6 +129,72 @@ export default function EstructuraPage() {
     wX_piso, wY_piso, Mx_piso, My_piso, Vx_piso, Vy_piso,
     wX_techo, wY_techo, Mx_techo, My_techo, Vx_techo, Vy_techo,
     N_int, N_bor, N_esq, sugCol
+  };
+
+  // ---------- (A) Lote local ----------
+  type BatchItem = {
+    kind: "boceto_estructural";
+    title: string;
+    materials: MaterialRow[];
+    inputs: {
+      Lx: number; Ly: number; nx: number; ny: number; plantas: number;
+      usoKey: string; techoKey: string; espLosa_cm: number; gAcabados: number;
+    };
+    outputs: Record<string, any>;
+  };
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
+  const addCurrentToBatch = () => {
+    const inputs = { Lx, Ly, nx, ny, plantas, usoKey, techoKey, espLosa_cm, gAcabados };
+    const item: BatchItem = {
+      kind: "boceto_estructural",
+      title: defaultTitle,
+      materials: itemsForProject,
+      inputs,
+      outputs: raw,
+    };
+    setBatch(prev => {
+      if (editIndex !== null) {
+        const next = [...prev];
+        next[editIndex] = item;
+        return next;
+      }
+      return [...prev, item];
+    });
+    setEditIndex(null);
+  };
+
+  const handleEditFromBatch = (index: number) => {
+    const it = batch[index];
+    if (!it) return;
+    setLx(it.inputs.Lx);
+    setLy(it.inputs.Ly);
+    setNx(it.inputs.nx);
+    setNy(it.inputs.ny);
+    setPlantas(it.inputs.plantas);
+    setUsoKey(it.inputs.usoKey);
+    setTechoKey(it.inputs.techoKey);
+    setEspLosa(it.inputs.espLosa_cm);
+    setGAcabados(it.inputs.gAcabados);
+    setEditIndex(index);
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatch(prev => prev.filter((_, i) => i !== index));
+    if (editIndex === index) setEditIndex(null);
+  };
+
+  // ---------- (C) Actualizar partida ----------
+  const handleUpdatePartida = () => {
+    if (!projectId || !partidaId) return;
+    updatePartida(projectId, partidaId, {
+      title: defaultTitle,
+      inputs: { Lx, Ly, nx, ny, plantas, usoKey, techoKey, espLosa_cm, gAcabados },
+      outputs: raw,
+      materials: itemsForProject,
+    });
+    alert("Partida actualizada.");
   };
 
   return (
@@ -236,14 +329,69 @@ export default function EstructuraPage() {
         </div>
       </div>
 
-      {/* Botón para guardar como partida */}
+      {/* Guardar como partida */}
       <AddToProject
         kind="boceto_estructural"
         defaultTitle={defaultTitle}
-        // @ts-ignore: si tu AddToProject aún tipa unit:string, esto evita ruido
-        items={items}
+        items={itemsForProject}
         raw={raw}
       />
+
+      {/* Botón (A) para armar lote local rápido */}
+      <div>
+        <button
+          type="button"
+          className="rounded border px-4 py-2"
+          onClick={addCurrentToBatch}
+          title={editIndex !== null ? "Guardar ítem del lote" : "Añadir boceto al lote"}
+        >
+          {editIndex !== null ? "Guardar ítem del lote" : "Añadir boceto al lote"}
+        </button>
+        {editIndex !== null && (
+          <button
+            type="button"
+            className="rounded border px-3 py-2 ml-2"
+            onClick={() => setEditIndex(null)}
+          >
+            Cancelar edición
+          </button>
+        )}
+      </div>
+
+      {/* Lote local (A) */}
+      {batch.length > 0 && (
+        <div className="card p-4 space-y-3">
+          <h2 className="font-medium">Lote local (Boceto estructural)</h2>
+          <BatchList
+            items={batch.map((b) => ({ title: b.title }))}
+            onEdit={handleEditFromBatch}
+            onRemove={handleRemoveFromBatch}
+          />
+          <AddToProjectBatch
+            items={batch.map((b) => ({
+              kind: b.kind,
+              title: b.title,
+              materials: b.materials,
+              inputs: b.inputs,
+              outputs: b.outputs,
+            }))}
+            onSaved={() => setBatch([])}
+          />
+        </div>
+      )}
+
+      {/* Deep-link: actualizar partida (C) */}
+      {projectId && partidaId ? (
+        <div>
+          <button
+            type="button"
+            className="rounded border px-3 py-2"
+            onClick={handleUpdatePartida}
+          >
+            Actualizar partida
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -254,4 +402,14 @@ function suggestCol(NkN: number) {
   if (NkN <= 800) return { rec: "≈ Columna 25×30 cm", note: `N ≈ ${NkN} kN` };
   if (NkN <= 1200) return { rec: "≈ Columna 30×30 cm", note: `N ≈ ${NkN} kN` };
   return { rec: "Consulta con ingenier@", note: `N ≈ ${NkN} kN (alta)` };
+}
+
+// Este es el componente de página que se exporta por defecto.
+// Envuelve el calculador en <Suspense> para evitar el error de build.
+export default function EstructuraPage() {
+  return (
+    <Suspense fallback={<div>Cargando boceto...</div>}>
+      <EstructuraCalculator />
+    </Suspense>
+  );
 }

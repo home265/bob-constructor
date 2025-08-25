@@ -1,8 +1,10 @@
 "use client";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getProject, removePartida } from "@/lib/project/storage";
 import { aggregateMaterials } from "@/lib/project/compute";
 import type { Project } from "@/lib/project/types";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 function downloadText(filename: string, text: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([text], { type: mime });
@@ -15,6 +17,22 @@ function downloadText(filename: string, text: string, mime = "text/plain;charset
   URL.revokeObjectURL(url);
 }
 
+// 👉 Ajustá estos paths si tus rutas difieren
+const KIND_ROUTES: Record<string, string> = {
+  muro: "/muros",
+  carpeta: "/carpeta",
+  contrapiso: "/contrapiso",
+  revestimiento: "/revestimiento",
+  revoque: "/revoque",
+  base: "/base",
+  columna: "/columna",
+  losa: "/losa",
+  losa_premoldeada: "/losa-premoldeada",
+  pilote: "/pilote",
+  viga: "/viga",
+  boceto_estructural: "/estructura",
+};
+
 export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -24,12 +42,12 @@ export default function ProyectoDetallePage() {
     if (typeof window !== "undefined") router.replace("/proyecto");
     return null;
   }
-  // Alias NO nulo para que TS no se queje dentro de funciones/closures
   const p: Project = projectMaybe;
 
   const mat = aggregateMaterials(p);
   const safeName = p.name.replace(/[^\w\-]+/g, "_").toLowerCase();
 
+  // --- compartir / exportar ---
   async function onShare() {
     const text =
 `Proyecto: ${p.name}
@@ -42,11 +60,9 @@ Resumen:
 ${mat.slice(0, 12).map(m => `• ${m.label}: ${m.qty} ${m.unit}`).join("\n")}
 ${mat.length > 12 ? "…" : ""}`;
 
-    // Web Share API si está disponible; fallback a WhatsApp
     const navAny = navigator as any;
     if (navAny.share) {
-      try { await navAny.share({ title: `Presupuesto - ${p.name}`, text }); }
-      catch { /* usuario canceló */ }
+      try { await navAny.share({ title: `Presupuesto - ${p.name}`, text }); } catch {}
     } else {
       const msg = encodeURIComponent(text);
       window.open(`https://wa.me/?text=${msg}`, "_blank");
@@ -65,6 +81,18 @@ ${mat.length > 12 ? "…" : ""}`;
   function onExportJSON() {
     downloadText(`proyecto_${safeName}.json`, JSON.stringify(p, null, 2), "application/json");
   }
+
+  // --- edición / eliminación ---
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<{ partidaId: string; title: string } | null>(null);
+
+  const makeEditHref = (kind: string, partidaId: string) => {
+    const base = KIND_ROUTES[kind] ?? `/${kind}`;
+    const sp = new URLSearchParams({ projectId: p.id, partidaId });
+    return `${base}?${sp.toString()}`;
+  };
+
+  const partidasUI = useMemo(() => p.partes, [p.partes]);
 
   return (
     <section className="space-y-6 container mx-auto px-4 max-w-5xl">
@@ -87,22 +115,31 @@ ${mat.length > 12 ? "…" : ""}`;
         {/* Partidas */}
         <div className="card p-4">
           <h2 className="font-medium mb-3">Partidas</h2>
-          {p.partes.length === 0 ? (
+          {partidasUI.length === 0 ? (
             <p className="text-sm text-foreground/60">Todavía no agregaste partidas desde las calculadoras.</p>
           ) : (
             <ul className="space-y-2">
-              {p.partes.map(part => (
-                <li key={part.id} className="border rounded p-2 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">{part.title}</div>
+              {partidasUI.map(part => (
+                <li key={part.id} className="border rounded p-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{part.title}</div>
                     <div className="text-xs text-foreground/60">{part.kind}</div>
                   </div>
-                  <button
-                    className="btn-danger"
-                    onClick={() => { removePartida(p.id, part.id); location.reload(); }}
-                  >
-                    Quitar
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn-secondary"
+                      onClick={() => router.push(makeEditHref(part.kind, part.id))}
+                      title="Editar (abrir calculadora con esta partida)"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="btn-danger"
+                      onClick={() => { setToDelete({ partidaId: part.id, title: part.title }); setConfirmOpen(true); }}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -136,6 +173,25 @@ ${mat.length > 12 ? "…" : ""}`;
           )}
         </div>
       </div>
+
+      {/* Confirmación de eliminación */}
+      <ConfirmDialog
+  open={confirmOpen}
+  title="Eliminar partida"
+  message={toDelete ? `¿Seguro que querés eliminar “${toDelete.title}” del proyecto?` : ""}
+  confirmLabel="Eliminar"
+  cancelLabel="Cancelar"
+  onConfirm={() => {
+    if (toDelete) {
+      removePartida(p.id, toDelete.partidaId);
+      setConfirmOpen(false);
+      setToDelete(null);
+      location.reload();
+    }
+  }}
+  onCancel={() => { setConfirmOpen(false); setToDelete(null); }}
+/>
+
     </section>
   );
 }

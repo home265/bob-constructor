@@ -1,13 +1,19 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useSearchParams, useRouter } from "next/navigation";
+import { getPartida, updatePartida } from "@/lib/project/storage";
+import type { MaterialLine, Unit } from "@/lib/project/types";
 
+import type { OpeningVM } from "@/components/inputs/OpeningsGroup";
 import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 import OpeningsGroup from "@/components/inputs/OpeningsGroup";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import AddToProject from "@/components/ui/AddToProject";
+import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
+import BatchList from "@/components/ui/BatchList";
 
 import {
   loadDefaults,
@@ -37,23 +43,43 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function PageMuros() {
+type BatchItem = {
+  kind: "muro";
+  title: string;
+  materials: { key?: string; label: string; qty: number; unit: string }[];
+  inputs: Record<string, any>;
+  outputs: Record<string, any>;
+};
+
+function MurosCalculator() {
+  // ---- Deep-link edición ----
+  const search = useSearchParams();
+  const router = useRouter();
+  const projectId = search.get("projectId");
+  const partidaId = search.get("partidaId");
+  const editMode = !!(projectId && partidaId);
+
   const [opts, setOpts] = useState<WallOptions | null>(null);
   const [coeffs, setCoeffs] = useState<WallCoefficient[] | null>(null);
   const [mortars, setMortars] = useState<Mortar[] | null>(null);
   const [defaults, setDefaults] = useState<any>(null);
-  const [vanos, setVanos] = useState([
+  const [vanos, setVanos] = useState<OpeningVM[]>([
     { lv: 0, hv: 0 },
     { lv: 0, hv: 0 },
     { lv: 0, hv: 0 },
   ]);
   const [res, setRes] = useState<WallResult | null>(null);
 
+  // Lote local
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -85,6 +111,24 @@ export default function PageMuros() {
     })();
   }, [setValue]);
 
+  // Precarga si venís desde Proyecto (edición)
+  useEffect(() => {
+    if (!editMode) return;
+    const p = getPartida(projectId!, partidaId!);
+    if (!p) return;
+    const inp = (p.inputs || {}) as Partial<WallFormInput> & { vanos?: OpeningVM[] };
+    if (inp.tipoMuroId) setValue("tipoMuroId", inp.tipoMuroId as any);
+    if (inp.ladrilloId) setValue("ladrilloId", String(inp.ladrilloId));
+    if (typeof inp.juntaMm === "number") setValue("juntaMm", inp.juntaMm);
+    if (inp.morteroAsientoId) setValue("morteroAsientoId", String(inp.morteroAsientoId));
+    if (typeof inp.L === "number") setValue("L", inp.L);
+    if (typeof inp.H === "number") setValue("H", inp.H);
+    if (typeof inp.SA === "number") setValue("SA", inp.SA);
+    if (typeof (inp as any).desperdicioPct === "number") setValue("desperdicioPct", (inp as any).desperdicioPct);
+    if (Array.isArray(inp.vanos)) setVanos(inp.vanos as OpeningVM[]);
+    if (p.outputs) setRes(p.outputs as WallResult);
+  }, [editMode, projectId, partidaId, setValue]);
+
   const onSubmit = (fv: FormValues) => {
     if (!coeffs || !mortars || !defaults) return;
     const input: WallFormInput = { ...fv, vanos };
@@ -94,15 +138,29 @@ export default function PageMuros() {
 
   // Etiquetas y unidades para mapear res → filas
   const LABELS: Record<string, { label: string; unit?: string }> = {
-    area_m2: { label: "Área de muro", unit: "m²" },
+    // áreas
+    areaNeta_m2: { label: "Área de muro", unit: "m²" },
+    area_m2: { label: "Área de muro", unit: "m²" }, // alias
     S_m2: { label: "Área de muro", unit: "m²" }, // alias
+
+    // volumen de mampostería (si existiera)
     volumen_m3: { label: "Volumen (mampostería)", unit: "m³" },
+
+    // unidades de pieza
     ladrillos_u: { label: "Unidades ladrillo/bloque", unit: "u" },
     unidades: { label: "Unidades ladrillo/bloque", unit: "u" }, // alias
-    mortero_m3: { label: "Mortero de asiento", unit: "m³" },
+
+    // mortero de asiento
+    mortero_asiento_m3: { label: "Mortero de asiento", unit: "m³" },
+    mortero_m3: { label: "Mortero de asiento", unit: "m³" }, // alias
+
+    // desglose de mortero
     cemento_bolsas: { label: "Cemento", unit: "bolsas" },
-    cal_bolsas: { label: "Cal", unit: "bolsas" },
+    cal_kg: { label: "Cal", unit: "kg" },
     arena_m3: { label: "Arena", unit: "m³" },
+    agua_l: { label: "Agua", unit: "l" },
+
+    // otras
     revoque_m3: { label: "Revoque", unit: "m³" },
   };
 
@@ -110,7 +168,27 @@ export default function PageMuros() {
   const items: ResultRow[] = useMemo(() => {
     const arr: ResultRow[] = [];
     if (!res) return arr;
-    for (const [k, v] of Object.entries(res as Record<string, unknown>)) {
+
+    // completar arena por proporción si faltara
+    const mortId = watch("morteroAsientoId");
+    const volMort =
+      (res as any).mortero_asiento_m3 ??
+      (res as any).mortero_m3 ??
+      null;
+
+    let augmented: Record<string, unknown> = { ...(res as Record<string, unknown>) };
+
+    if (volMort && typeof volMort === "number" && mortars?.length) {
+      const mortar = mortars.find((m) => m.id === mortId) as any;
+      const prop = mortar?.proporcion;
+      const total = (prop?.cemento ?? 0) + (prop?.cal ?? 0) + (prop?.arena ?? 0);
+      if (!(augmented as any).arena_m3 && total > 0) {
+        const arenaFrac = (prop?.arena ?? 0) / total;
+        (augmented as any).arena_m3 = Math.round(volMort * arenaFrac * 100) / 100;
+      }
+    }
+
+    for (const [k, v] of Object.entries(augmented)) {
       const meta = LABELS[k];
       if (!meta) continue;
       if (typeof v !== "number" || !Number.isFinite(v)) continue;
@@ -118,46 +196,140 @@ export default function PageMuros() {
       arr.push({ label: meta.label, qty, unit: meta.unit });
     }
     return arr;
-  }, [res]);
+  }, [res, mortars, watch("morteroAsientoId")]);
 
   // Sólo materiales reales para guardar en Proyecto
   const MATERIAL_KEYS = new Set([
     "ladrillos_u",
     "unidades",
-    "mortero_m3",
+    "mortero_asiento_m3",
     "cemento_bolsas",
-    "cal_bolsas",
+    "cal_kg",
     "arena_m3",
+    "agua_l",
     "revoque_m3",
   ]);
+  
+  // Normaliza las unidades al tipo Unit de Project
+const toUnit = (u?: string): Unit =>
+  u === "m²" ? "m2" :
+  u === "m³" ? "m3" :
+  u === "bolsas" ? "u" :
+  (["u","m","m2","m3","kg","l"] as const).includes((u ?? "") as Unit) ? (u as Unit) : "u";
 
-  const itemsForProject = useMemo(
-    () => {
-      if (!res) return [] as { key?: string; label: string; qty: number; unit: string }[];
-      const out: { key?: string; label: string; qty: number; unit: string }[] = [];
-      for (const [k, v] of Object.entries(res as Record<string, unknown>)) {
-        if (!MATERIAL_KEYS.has(k)) continue;
-        if (typeof v !== "number" || !Number.isFinite(v)) continue;
-        const meta = LABELS[k];
-        out.push({
-          key: k,
-          label: meta?.label ?? k,
-          qty: Math.round(v * 100) / 100,
-          unit: (meta?.unit ?? "u") as string,
-        });
+
+  // Materiales para Proyecto (alineado con items)
+  const itemsForProject = useMemo(() => {
+    if (!res) return [] as { key?: string; label: string; qty: number; unit: string }[];
+
+    const mortId = watch("morteroAsientoId");
+    const volMort =
+      (res as any).mortero_asiento_m3 ??
+      (res as any).mortero_m3 ??
+      null;
+
+    const augmented: Record<string, unknown> = { ...(res as Record<string, unknown>) };
+
+    if (volMort && typeof volMort === "number" && mortars?.length) {
+      const mortar = mortars.find((m) => m.id === mortId) as any;
+      const prop = mortar?.proporcion;
+      const total = (prop?.cemento ?? 0) + (prop?.cal ?? 0) + (prop?.arena ?? 0);
+      if (!(augmented as any).arena_m3 && total > 0) {
+        const arenaFrac = (prop?.arena ?? 0) / total;
+        (augmented as any).arena_m3 = Math.round(volMort * arenaFrac * 100) / 100;
       }
-      return out;
-    },
-    [res]
-  );
+    }
+
+    const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+    for (const [k, v] of Object.entries(augmented)) {
+      if (!MATERIAL_KEYS.has(k)) continue;
+      if (typeof v !== "number" || !Number.isFinite(v)) continue;
+      const meta = LABELS[k];
+      out.push({
+        key: k,
+        label: meta?.label ?? k,
+        qty: Math.round(v * 100) / 100,
+        unit: (meta?.unit ?? "u") as string,
+      });
+    }
+    return out;
+  }, [res, mortars, watch("morteroAsientoId")]);
 
   // Título por defecto de la partida
   const defaultTitle = useMemo(() => {
     const L = watch("L") ?? 0;
     const H = watch("H") ?? 0;
     const j = watch("juntaMm") ?? 10;
-    return `Muro ${L}×${H} m · junta ${j} mm`;
-  }, [watch("L"), watch("H"), watch("juntaMm")]);
+    const nVanos = vanos.filter((v) => (v.sv ?? (v.lv * v.hv)) > 0).length;
+    return `Muro ${L}×${H} m · junta ${j} mm${nVanos ? ` · vanos ${nVanos}` : ""}`;
+  }, [watch("L"), watch("H"), watch("juntaMm"), vanos]);
+
+  // Helpers para lote local (solo toma del resultado tal cual)
+  function buildMaterialsFrom(result: WallResult) {
+    const out: { key?: string; label: string; qty: number; unit: string }[] = [];
+    for (const [k, v] of Object.entries(result as Record<string, unknown>)) {
+      if (!MATERIAL_KEYS.has(k)) continue;
+      if (typeof v !== "number" || !Number.isFinite(v)) continue;
+      const meta = LABELS[k];
+      out.push({
+        key: k,
+        label: meta?.label ?? k,
+        qty: Math.round(v * 100) / 100,
+        unit: (meta?.unit ?? "u") as string,
+      });
+    }
+    return out;
+  }
+
+  const addCurrentToBatch = () => {
+    if (!coeffs || !mortars || !defaults) return;
+    const fv = getValues();
+    const input: WallFormInput = { ...fv, vanos };
+    const r = computeMuros(input, coeffs, mortars, defaults);
+    const materials = buildMaterialsFrom(r);
+
+    const item: BatchItem = {
+      kind: "muro",
+      title: defaultTitle,
+      materials,
+      inputs: input as any,
+      outputs: r as any,
+    };
+
+    setRes(r);
+
+    setBatch((prev) => {
+      if (editIndex !== null) {
+        const next = [...prev];
+        next[editIndex] = item;
+        return next;
+      }
+      return [...prev, item];
+    });
+    setEditIndex(null);
+  };
+
+  const handleEditFromBatch = (index: number) => {
+    const it = batch[index];
+    if (!it) return;
+    const inp = it.inputs as FormValues & { vanos?: typeof vanos };
+    setValue("tipoMuroId", inp.tipoMuroId);
+    setValue("ladrilloId", inp.ladrilloId);
+    setValue("juntaMm", inp.juntaMm);
+    setValue("morteroAsientoId", inp.morteroAsientoId as any);
+    setValue("L", inp.L);
+    setValue("H", inp.H);
+    setValue("SA", inp.SA ?? 0);
+    setValue("desperdicioPct", inp.desperdicioPct ?? 7);
+    setVanos((inp as any).vanos ?? []);
+    setRes(it.outputs as WallResult);
+    setEditIndex(index);
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatch((prev) => prev.filter((_, i) => i !== index));
+    if (editIndex === index) setEditIndex(null);
+  };
 
   if (!opts) return <p>Cargando catálogos…</p>;
 
@@ -279,7 +451,8 @@ export default function PageMuros() {
 
             {/* Vanos */}
             <div className="space-y-2">
-              <div className="font-medium">Vanos a descontar (hasta 3)</div>
+              <div className="font-medium">Vanos a descontar</div>
+              <p className="text-xs text-gray-500">LV/HV en <b>m</b> · SV en <b>m²</b></p>
               <div className="overflow-x-auto">
                 <OpeningsGroup items={vanos} onChange={setVanos} />
               </div>
@@ -301,13 +474,108 @@ export default function PageMuros() {
               <span className="text-sm">{watch("desperdicioPct") ?? 7}%</span>
             </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting || !coeffs || !mortars}
-              className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
-            >
-              Calcular
-            </button>
+            {/* Botonera */}
+            <div className="flex items-center gap-3">
+              {!editMode ? (
+                <>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !coeffs || !mortars}
+                    className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
+                  >
+                    Calcular
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded border px-4 py-2"
+                    onClick={addCurrentToBatch}
+                    disabled={!coeffs || !mortars}
+                    title={editIndex !== null ? "Guardar cambios del ítem" : "Añadir muro al lote"}
+                  >
+                    {editIndex !== null ? "Guardar ítem del lote" : "Añadir muro al lote"}
+                  </button>
+
+                  {editIndex !== null && (
+                    <button
+                      type="button"
+                      className="rounded border px-3 py-2"
+                      onClick={() => setEditIndex(null)}
+                    >
+                      Cancelar edición
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={isSubmitting || !coeffs || !mortars}
+                    className="rounded bg-black text-white px-4 py-2 disabled:opacity-50"
+                    onClick={() => {
+                      if (!coeffs || !mortars || !defaults) return;
+                      const fv = getValues();
+                      const input: WallFormInput = { ...fv, vanos };
+                      const r = computeMuros(input, coeffs, mortars, defaults);
+                      setRes(r);
+
+                      // materiales para update (alineados con itemsForProject)
+                      const mortId = fv.morteroAsientoId;
+                      const volMort =
+                        (r as any).mortero_asiento_m3 ??
+                        (r as any).mortero_m3 ??
+                        null;
+                      const augmented: Record<string, unknown> = { ...(r as Record<string, unknown>) };
+                      if (volMort && typeof volMort === "number" && mortars?.length) {
+                        const mortar = mortars.find((m) => m.id === mortId) as any;
+                        const prop = mortar?.proporcion;
+                        const total = (prop?.cemento ?? 0) + (prop?.cal ?? 0) + (prop?.arena ?? 0);
+                        if (!(augmented as any).arena_m3 && total > 0) {
+                          const arenaFrac = (prop?.arena ?? 0) / total;
+                          (augmented as any).arena_m3 = Math.round((volMort as number) * arenaFrac * 100) / 100;
+                        }
+                      }
+                      const materials = Object.entries(augmented)
+  .filter(([k, v]) => MATERIAL_KEYS.has(k) && typeof v === "number" && Number.isFinite(v as number))
+  .map(([k, v]) => {
+    const meta = LABELS[k];
+    return {
+      key: k,
+      label: meta?.label ?? k,
+      qty: Math.round((v as number) * 100) / 100,
+      unit: (meta?.unit ?? "u") as string,
+    };
+  });
+
+// 👇 convierte string → Unit para que cumpla el tipo MaterialLine
+const materialsForUpdate: MaterialLine[] = materials.map(m => ({
+  ...m,
+  unit: toUnit(m.unit),
+}));
+
+updatePartida(projectId!, partidaId!, {
+  title: defaultTitle,
+  inputs: input,
+  outputs: r,
+  materials: materialsForUpdate,
+});
+
+
+                      router.push(`/proyecto/${projectId}`);
+                    }}
+                  >
+                    Actualizar partida
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border px-3 py-2"
+                    onClick={() => router.push(`/proyecto/${projectId}`)}
+                  >
+                    Volver al proyecto
+                  </button>
+                </>
+              )}
+            </div>
           </form>
         </div>
 
@@ -316,7 +584,22 @@ export default function PageMuros() {
           <h2 className="text-lg font-semibold mb-2">Resultado</h2>
           {res ? (
             items.length ? (
-              <ResultTable title="Resultado" items={items} />
+              <>
+                <ResultTable title="Resultado" items={items} />
+                {/* leyenda de mortero */}
+                {(() => {
+                  const mortId = watch("morteroAsientoId");
+                  const m = mortars?.find((mm) => mm.id === mortId) as any;
+                  const p = m?.proporcion;
+                  const agua = m?.agua_l_por_m3;
+                  return p ? (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Proporción mortero (cemento:cal:arena): <b>{p.cemento ?? 0} : {p.cal ?? 0} : {p.arena ?? 0}</b>
+                      {typeof agua === "number" ? <> · Agua de referencia: <b>{agua} L/m³</b></> : null}
+                    </p>
+                  ) : null;
+                })()}
+              </>
             ) : (
               <pre className="text-xs whitespace-pre-wrap">
                 {JSON.stringify(res, null, 2)}
@@ -330,8 +613,34 @@ export default function PageMuros() {
         </div>
       </div>
 
-      {/* Guardar en Proyecto */}
-      {res && (
+      {/* Lote local */}
+      {!editMode && batch.length > 0 && (
+        <div className="card p-4 space-y-3">
+          <h2 className="text-lg font-semibold">Lote local (Muros)</h2>
+          <BatchList
+            items={batch.map((b) => ({
+              title: b.title,
+              subtitle: undefined,
+              materials: undefined,
+            }))}
+            onEdit={handleEditFromBatch}
+            onRemove={handleRemoveFromBatch}
+          />
+          <AddToProjectBatch
+            items={batch.map((b) => ({
+              kind: b.kind,
+              title: b.title,
+              materials: b.materials as any,
+              inputs: b.inputs,
+              outputs: b.outputs,
+            }))}
+            onSaved={() => setBatch([])}
+          />
+        </div>
+      )}
+
+      {/* Guardar en Proyecto (unitario) */}
+      {!editMode && res && (
         <AddToProject
           kind="muro"
           defaultTitle={defaultTitle}
@@ -340,5 +649,15 @@ export default function PageMuros() {
         />
       )}
     </section>
+  );
+}
+
+// Este es el componente de página que se exporta por defecto.
+// Envuelve el calculador en <Suspense> para evitar el error de build.
+export default function PageMuros() {
+  return (
+    <Suspense fallback={<div>Cargando calculadora de muros...</div>}>
+      <MurosCalculator />
+    </Suspense>
   );
 }
