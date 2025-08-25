@@ -14,6 +14,7 @@ const ITEMS: NavItem[] = [
   { label: "Revoque", href: "/revoque" },
   { label: "Revestimientos", href: "/revestimientos" },
   { label: "Boceto estructural", href: "/estructura" },
+  { label: "Proyecto", href: "/proyecto" },
   {
     label: "Hormigón",
     children: [

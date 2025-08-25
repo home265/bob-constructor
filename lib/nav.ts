@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
 
   // 👇 nuevo
   { label: "Boceto estructural", href: "/estructura" },
+  { label: "Proyecto", href: "/proyecto" },
 
   {
     label: "Hormigón",
