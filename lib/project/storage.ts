@@ -46,6 +46,21 @@ export function createProject(data: Partial<Project>) {
   return p;
 }
 
+// 👇 FUNCIÓN AÑADIDA PARA ELIMINAR PROYECTOS 👇
+export function deleteProject(projectId: string): void {
+  if (!isBrowser()) return;
+
+  const all = readAll();
+  const newList = all.filter(p => p.id !== projectId);
+  writeAll(newList);
+
+  // Opcional: Si el proyecto eliminado era el activo, lo limpiamos
+  if (getActiveProjectId() === projectId) {
+    localStorage.removeItem(ACTIVE);
+  }
+}
+// 👆 FIN DE LA FUNCIÓN AÑADIDA 👆
+
 export function addPartida(projectId: string, part: Omit<Partida, "id" | "createdAt">) {
   const p = getProject(projectId);
   if (!p) throw new Error("Proyecto no encontrado");

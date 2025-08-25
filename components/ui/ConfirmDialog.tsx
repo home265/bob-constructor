@@ -30,10 +30,22 @@ export default function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg p-4 w-[min(92vw,420px)] shadow-lg">
-        <h3 className="text-lg font-medium mb-2">{title}</h3>
+    // Fondo oscuro semi-transparente (este estaba bien)
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+      
+      {/* Contenedor del modal.
+        ANTES: className="bg-white rounded-lg p-4 w-[min(92vw,420px)] shadow-lg"
+        AHORA: Usamos tu clase "card" para que tome el estilo oscuro y ajustamos el padding.
+      */}
+      <div className="card p-6 rounded-lg w-[min(92vw,420px)] shadow-xl">
+        
+        {/* Título: Le agregamos un color de texto para que sea visible en fondo oscuro */}
+        <h3 className="text-lg font-medium mb-2 text-foreground">{title}</h3>
+        
+        {/* Mensaje (este estaba bien con text-foreground/70) */}
         <p className="text-sm text-foreground/70 mb-4">{message}</p>
+        
+        {/* Botones (estos ya tenían las clases correctas) */}
         <div className="flex justify-end gap-2">
           <button className="btn-secondary" onClick={onCancel}>{cancelLabel}</button>
           <button className="btn-danger" onClick={onConfirm}>{confirmLabel}</button>

@@ -1,9 +1,21 @@
 "use client";
 import Link from "next/link";
-import { listProjects, setActiveProjectId } from "@/lib/project/storage";
+import { useState } from "react"; // Importamos useState
+import { listProjects, setActiveProjectId, deleteProject } from "@/lib/project/storage"; // Importamos deleteProject
 
 export default function ProyectosPage() {
-  const list = listProjects();
+  // Estado para manejar la lista de proyectos dinámicamente
+  const [projects, setProjects] = useState(() => listProjects());
+
+  // Función para manejar la eliminación
+  const handleDelete = (projectId: string, projectName: string) => {
+    // Usamos el confirm nativo por ahora
+    if (window.confirm(`¿Estás seguro de que querés eliminar el proyecto "${projectName}"? Esta acción no se puede deshacer.`)) {
+      deleteProject(projectId);
+      // Actualizamos la lista de proyectos en la pantalla
+      setProjects(listProjects());
+    }
+  };
 
   return (
     <section className="container mx-auto px-4 max-w-5xl space-y-6">
@@ -12,11 +24,11 @@ export default function ProyectosPage() {
         <Link href="/proyecto/nuevo" className="btn">Nuevo proyecto</Link>
       </div>
 
-      {list.length === 0 ? (
+      {projects.length === 0 ? (
         <p className="text-sm text-foreground/60">Aún no hay proyectos.</p>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {list.map((p) => (
+          {projects.map((p) => (
             <div key={p.id} className="card p-4">
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-foreground/60">{p.client || "—"}</div>
@@ -29,6 +41,15 @@ export default function ProyectosPage() {
                   title="Marcar como activo"
                 >
                   Activar
+                </button>
+                {/* Botón de Eliminar */}
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={() => handleDelete(p.id, p.name)}
+                  title="Eliminar proyecto"
+                >
+                  Eliminar
                 </button>
               </div>
             </div>
