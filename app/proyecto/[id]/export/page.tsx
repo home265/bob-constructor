@@ -1,3 +1,4 @@
+// app/proyecto/[id]/export/page.tsx
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -12,7 +13,7 @@ export default function ProyectoExportPage() {
   const [project, setProject] = useState<DBProject | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // carga inicial (async)
+  // Carga inicial
   useEffect(() => {
     (async () => {
       const p = await getProject(id);
@@ -25,78 +26,121 @@ export default function ProyectoExportPage() {
     })();
   }, [id, router]);
 
-  if (loading) return <div className="mx-auto max-w-[840px] p-6">Cargando…</div>;
-  if (!project) return null;
-
-  const mat = useMemo(() => aggregateMaterials(project), [project]);
-  const date = new Date().toLocaleDateString("es-AR");
+  const mat = useMemo(() => (project ? aggregateMaterials(project) : []), [project]);
+  const date = new Date().toLocaleDateString("es-AR", {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
 
   function onPrint() {
     window.print();
   }
 
+  if (loading) {
+    return <div className="p-6 text-center">Cargando vista previa...</div>;
+  }
+  if (!project) return null;
+
   return (
-    <div className="mx-auto max-w-[840px] p-6 print:p-0">
+    // Estilos para modo claro (light mode) para una mejor impresión
+    <div className="mx-auto max-w-4xl p-8 print:p-0 bg-white text-gray-800 font-sans">
       <style jsx global>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: #ffffff !important; }
-          @page { size: A4; margin: 14mm; }
+          body { 
+            background: #ffffff !important; 
+            color: #111827 !important; 
+          }
+          @page { 
+            size: A4; 
+            margin: 1.5cm; 
+          }
         }
-        .hline { border-top: 1px solid rgba(0,0,0,.15); }
-        .muted { color: rgba(0,0,0,.6); }
-        .tbl th, .tbl td { padding: 6px 8px; font-size: 12px; }
-        .tbl thead th { text-align: left; color: rgba(0,0,0,.6); border-bottom: 1px solid rgba(0,0,0,.15); }
-        .tbl tbody tr { border-bottom: 1px solid rgba(0,0,0,.08); }
-        .title { font-size: 20px; font-weight: 600; margin: 0; }
+        .header-title { font-size: 24px; font-weight: 700; color: #1a202c; }
+        .project-details { color: #4a5568; }
+        .section-title { 
+          font-size: 18px; 
+          font-weight: 600; 
+          margin-top: 2rem; 
+          margin-bottom: 0.5rem; 
+          border-bottom: 2px solid #e2e8f0; 
+          padding-bottom: 0.25rem; 
+          color: #2d3748;
+        }
+        .materials-table { 
+          width: 100%; 
+          border-collapse: collapse; 
+          font-size: 12px; 
+        }
+        .materials-table th, .materials-table td { 
+          padding: 8px 4px; 
+          text-align: left;
+        }
+        .materials-table thead th { 
+          color: #718096; 
+          border-bottom: 1px solid #cbd5e0; 
+          font-weight: 600;
+        }
+        .materials-table tbody tr:nth-child(even) { 
+          background-color: #f7fafc; 
+        }
+        .materials-table .text-right {
+          text-align: right;
+        }
+        .footer-note { 
+          margin-top: 3rem; 
+          padding-top: 1rem;
+          border-top: 1px solid #e2e8f0;
+          font-size: 10px; 
+          color: #a0aec0; 
+          text-align: center; 
+        }
       `}</style>
 
-      <div className="no-print flex justify-between items-center mb-4">
-        <button onClick={() => router.back()} className="btn btn-secondary">← Volver</button>
-        <button onClick={onPrint} className="btn btn-primary">Imprimir / Guardar PDF</button>
+      <div className="no-print mb-6 flex justify-between items-center bg-gray-100 p-4 rounded-lg shadow-sm">
+        <button 
+          onClick={() => router.back()} 
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition-colors"
+        >
+          ← Volver al Proyecto
+        </button>
+        <button 
+          onClick={onPrint} 
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors"
+        >
+          Imprimir
+        </button>
       </div>
 
-      {/* Encabezado */}
-      <header className="mb-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="title">Presupuesto de materiales</h1>
-            <div className="muted">Proyecto: <strong>{project.name}</strong></div>
-            {project.client ? <div className="muted">Cliente: {project.client}</div> : null}
-            {project.siteAddress ? <div className="muted">Obra: {project.siteAddress}</div> : null}
-            {"contact" in project && project.contact ? (
-              <div className="muted">Contacto: {project.contact as string}</div>
-            ) : null}
-            <div className="muted">Fecha: {date}</div>
-          </div>
-          {"logoUrl" in project && project.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={project.logoUrl as string} alt="Logo" style={{ maxWidth: 120, maxHeight: 80 }} />
-          ) : null}
+      {/* Encabezado del Documento */}
+      <header className="mb-8">
+        <h1 className="header-title">{project.name}</h1>
+        <div className="project-details mt-2 space-y-1">
+          {project.client && <div><strong>Cliente:</strong> {project.client}</div>}
+          {project.siteAddress && <div><strong>Obra:</strong> {project.siteAddress}</div>}
+          <div><strong>Fecha de Emisión:</strong> {date}</div>
         </div>
-        {project.notes ? <p className="mt-3">{project.notes}</p> : null}
       </header>
 
-      {/* Resumen de materiales */}
-      <section className="mb-8">
-        <h2 className="font-medium mb-2">Resumen de materiales</h2>
+      {/* Resumen de Materiales */}
+      <section>
+        <h2 className="section-title">Resumen de Materiales</h2>
         {mat.length === 0 ? (
-          <div className="muted">Sin materiales aún.</div>
+          <div className="project-details">No hay materiales computados en este proyecto.</div>
         ) : (
-          <table className="w-full tbl">
+          <table className="materials-table">
             <thead>
               <tr>
                 <th>Material</th>
                 <th className="text-right">Cantidad</th>
-                <th>Unidad</th>
+                <th style={{ paddingLeft: '1rem' }}>Unidad</th>
               </tr>
             </thead>
             <tbody>
               {mat.map((m, i) => (
                 <tr key={`${m.key}-${i}`}>
                   <td>{m.label}</td>
-                  <td className="text-right">{m.qty}</td>
-                  <td>{m.unit}</td>
+                  <td className="text-right">{m.qty.toLocaleString('es-AR')}</td>
+                  <td style={{ paddingLeft: '1rem' }}>{m.unit}</td>
                 </tr>
               ))}
             </tbody>
@@ -104,35 +148,9 @@ export default function ProyectoExportPage() {
         )}
       </section>
 
-      {/* Partidas */}
-      <section>
-        <h2 className="font-medium mb-2">Partidas incluidas</h2>
-        {project.partes.length === 0 ? (
-          <div className="muted">No hay partidas cargadas.</div>
-        ) : (
-          <table className="w-full tbl">
-            <thead>
-              <tr>
-                <th>Descripción</th>
-                <th>Tipo</th>
-                <th>Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {project.partes.map(part => (
-                <tr key={part.id}>
-                  <td>{part.title}</td>
-                  <td>{part.kind}</td>
-                  <td>{new Date(part.createdAt).toLocaleDateString("es-AR")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      <footer className="mt-8 muted text-xs">
-        * Documento generado automáticamente para estimación de materiales. No reemplaza memorias ni cálculo estructural profesional.
+      {/* Pie de Página */}
+      <footer className="footer-note">
+        <p>Este documento fue generado por Bob Constructor. Los cálculos son una estimación y deben ser verificados por un profesional.</p>
       </footer>
     </div>
   );

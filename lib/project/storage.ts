@@ -17,8 +17,6 @@ function ensureClient() {
   }
 }
 
-const ACTIVE_KEY = "bob_active_project_v1"; // para recordar el proyecto activo en UI
-
 /** Ordena proyectos por updatedAt desc */
 function sortByUpdatedAtDesc(a: Project, b: Project) {
   return (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0);
@@ -145,32 +143,6 @@ export async function removeProject(id: string): Promise<void> {
   ensureClient();
   const db = getDB();
   await db.projects.delete(id);
-
-  // si estaba activo, lo limpiamos
-  if (getActiveProjectId() === id) {
-    setActiveProjectId(null);
-  }
-}
-
-/* ------------------------- Estado de UI: proyecto activo ------------------- */
-
-export function getActiveProjectId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(ACTIVE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setActiveProjectId(id: string | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (id) localStorage.setItem(ACTIVE_KEY, id);
-    else localStorage.removeItem(ACTIVE_KEY);
-  } catch {
-    // noop
-  }
 }
 
 /* ---------------------------- Partidas (cálculos) -------------------------- */
@@ -267,6 +239,26 @@ export async function removePartidaByKind(projectId: string, kind: string): Prom
   return true;
 }
 
+/**
+ * [NUEVA FUNCIÓN] Elimina una partida por su ID único dentro del proyecto.
+ * Esta es la forma más segura y recomendada.
+ */
+export async function removePartidaById(projectId: string, partidaId: string): Promise<boolean> {
+  ensureClient();
+  const db = getDB();
+  const p = await db.projects.get(projectId);
+  if (!p) return false;
+
+  const before = p.partes.length;
+  p.partes = p.partes.filter((pt) => pt.id !== partidaId);
+  if (p.partes.length === before) return false;
+
+  p.updatedAt = Date.now();
+  await db.projects.put(p);
+  return true;
+}
+
+
 /** Lee una partida por id dentro de un proyecto */
 export async function getPartida(
   projectId: string,
@@ -314,8 +306,8 @@ export async function updatePartida(
 /**
  * Migración opcional desde localStorage (versión anterior de Constructor).
  * Espera dos claves:
- *  - "bob_projects_v1": JSON con un array de proyectos con forma anterior
- *  - "bob_active_project_v1": id del proyecto activo
+ * - "bob_projects_v1": JSON con un array de proyectos con forma anterior
+ * - "bob_active_project_v1": id del proyecto activo
  *
  * Si todo migra bien, deja un flag "MIGRATED_V1" para no repetir.
  */
