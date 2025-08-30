@@ -75,42 +75,40 @@ export default function ProyectosPage() {
         </form>
       </div>
 
-      {/* Lista de Proyectos - Estilo Bob Gasista */}
-      <div className="space-y-4">
-         <h2 className="text-xl font-semibold">Proyectos Existentes</h2>
-          {projects.length === 0 ? (
-            <p className="text-sm text-center text-foreground/60 py-8 card">
-              Aún no hay proyectos.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {projects.map((p) => (
-                <div key={p.id} className="card p-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-foreground/60">{p.client || "Sin cliente"}</div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link className="btn btn-primary" href={`/proyecto/${p.id}`}>
-                      Editar/Ver Partidas
-                    </Link>
-                    <Link className="btn btn-secondary" href={`/proyecto/${p.id}/export`}>
-                      Ver Resumen y Exportar
-                    </Link>
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      onClick={() => handleDelete(p.id, p.name)}
-                      title="Eliminar proyecto"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+      {/* --- ESTE ES EL BLOQUE CORREGIDO --- */}
+      <div className="card p-4 space-y-3">
+        <h2 className="font-semibold">Proyectos Existentes</h2>
+        {projects.length === 0 ? (
+          <p className="text-sm text-foreground/70 pt-2">No hay proyectos todavía. ¡Crea el primero!</p>
+        ) : (
+          <div className="space-y-3">
+            {projects.map((p) => (
+              <div key={p.id} className="card p-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-xs text-foreground/60">{p.client || "Sin cliente"}</div>
                 </div>
-              ))}
-            </div>
-          )}
-       </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link className="btn btn-primary" href={`/proyecto/${p.id}`}>
+                    Editar/Ver Partidas
+                  </Link>
+                  <Link className="btn btn-secondary" href={`/proyecto/${p.id}/export`}>
+                    Ver Resumen y Exportar
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => handleDelete(p.id, p.name)}
+                    title="Eliminar proyecto"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
