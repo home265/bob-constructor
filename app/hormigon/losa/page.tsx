@@ -25,6 +25,25 @@ type ConcreteRow = {
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 type MeshRow = { id?: string; label?: string; kg_m2?: number };
 
+// Inputs que guardamos en la partida (para tipado fuerte)
+type LosaInputs = {
+  Lx_m: number;
+  Ly_m: number;
+  H_cm: number;
+  cover_cm: number;
+  concreteClassId: string;
+  wastePct: number;
+  mallaId?: string;
+  meshDoubleLayer?: boolean;
+  bars?: {
+    phi_x_mm: number;
+    spacing_x_cm: number;
+    phi_y_mm: number;
+    spacing_y_cm: number;
+    doubleLayer?: boolean;
+  };
+};
+
 // helper Unit para Project
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
@@ -36,7 +55,6 @@ function normalizeUnit(u: string): Unit {
   return "u";
 }
 
-// Componente principal que contiene toda la lógica del cliente
 function LosaCalculator() {
   const sp = useSearchParams();
   const projectId = sp.get("projectId");
@@ -105,31 +123,35 @@ function LosaCalculator() {
   const [sY, setSY] = useState(20); // cm
   const [doubleLayer, setDoubleLayer] = useState(false);
 
-  // (C) Precarga si venimos por deep-link
+  // (C) Precarga si venimos por deep-link —> ahora asíncrona y tipada
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = p?.inputs as any;
-    if (!inp) return;
-    if (typeof inp.Lx_m === "number") setLx(inp.Lx_m);
-    if (typeof inp.Ly_m === "number") setLy(inp.Ly_m);
-    if (typeof inp.H_cm === "number") setH(inp.H_cm);
-    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
-    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
-    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
-    if (typeof inp.mallaId === "string") {
-      setUseMesh(!!inp.mallaId);
-      setMeshId(inp.mallaId);
-    }
-    if (typeof inp.meshDoubleLayer === "boolean") setMeshDoubleLayer(inp.meshDoubleLayer);
-    if (inp.bars) {
-      setUseMesh(false);
-      setPhiX(inp.bars.phi_x_mm ?? phiX);
-      setSX(inp.bars.spacing_x_cm ?? sX);
-      setPhiY(inp.bars.phi_y_mm ?? phiY);
-      setSY(inp.bars.spacing_y_cm ?? sY);
-      setDoubleLayer(inp.bars.doubleLayer ?? doubleLayer);
-    }
+
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      const inp = (p?.inputs ?? undefined) as Partial<LosaInputs> | undefined;
+      if (!inp) return;
+
+      if (typeof inp.Lx_m === "number") setLx(inp.Lx_m);
+      if (typeof inp.Ly_m === "number") setLy(inp.Ly_m);
+      if (typeof inp.H_cm === "number") setH(inp.H_cm);
+      if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+      if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+      if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+
+      const hasMesh = typeof inp.mallaId === "string" && inp.mallaId !== "";
+      setUseMesh(hasMesh);
+      if (hasMesh) {
+        setMeshId(inp.mallaId!);
+        setMeshDoubleLayer(!!inp.meshDoubleLayer);
+      } else if (inp.bars) {
+        setPhiX(inp.bars.phi_x_mm ?? phiX);
+        setSX(inp.bars.spacing_x_cm ?? sX);
+        setPhiY(inp.bars.phi_y_mm ?? phiY);
+        setSY(inp.bars.spacing_y_cm ?? sY);
+        setDoubleLayer(!!inp.bars.doubleLayer);
+      }
+    })();
   }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rebarMap = useMemo(() => {
@@ -144,7 +166,12 @@ function LosaCalculator() {
     return m;
   }, [meshOpts]);
 
-  const res = C.calcLosa({
+  // Cálculo con fallback si la lib exporta default
+  const calc =
+    (C as any).calcLosa ??
+    (C as any).default ??
+    ((x: any) => x);
+  const res = calc({
     Lx_m: Lx,
     Ly_m: Ly,
     H_cm: H,
@@ -188,7 +215,7 @@ function LosaCalculator() {
   const rows: ResultRow[] = [];
   rows.push({ label: "Área", qty: res?.area_m2 ?? 0, unit: "m²" });
   rows.push({ label: "Espesor", qty: res?.espesor_cm ?? 0, unit: "cm" });
-  if (vol > 0) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (vol > 0) rows.push({ label: "Hormigón", qty: Math.round(vol * 100) / 100, unit: "m³", hint: "Con desperdicio" });
 
   if (res?.modo === "malla" && res?.malla_kg != null) {
     rows.push({
@@ -277,14 +304,14 @@ function LosaCalculator() {
     kind: "losa";
     title: string;
     materials: MaterialRow[];
-    inputs: any;
+    inputs: LosaInputs;
     outputs: Record<string, any>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const inputs = {
+    const inputs: LosaInputs = {
       Lx_m: Lx,
       Ly_m: Ly,
       H_cm: H,
@@ -324,7 +351,7 @@ function LosaCalculator() {
   const handleEditFromBatch = (index: number) => {
     const it = batch[index];
     if (!it) return;
-    const inp = it.inputs || {};
+    const inp = it.inputs || ({} as Partial<LosaInputs>);
     setLx(inp.Lx_m ?? Lx);
     setLy(inp.Ly_m ?? Ly);
     setH(inp.H_cm ?? H);
@@ -335,7 +362,7 @@ function LosaCalculator() {
     const hasMesh = typeof inp.mallaId === "string" && inp.mallaId !== "";
     setUseMesh(hasMesh);
     if (hasMesh) {
-      setMeshId(inp.mallaId);
+      setMeshId(inp.mallaId!);
       setMeshDoubleLayer(!!inp.meshDoubleLayer);
     } else if (inp.bars) {
       setPhiX(inp.bars.phi_x_mm ?? phiX);
@@ -375,7 +402,7 @@ function LosaCalculator() {
               spacing_y_cm: sY,
               doubleLayer,
             },
-      },
+      } satisfies LosaInputs,
       outputs: res as any,
       materials: itemsForProject,
     });
@@ -553,8 +580,6 @@ function LosaCalculator() {
   );
 }
 
-// Este es el componente de página que se exporta por defecto.
-// Envuelve el calculador en <Suspense> para evitar el error de build.
 export default function LosaPage() {
   return (
     <Suspense fallback={<div>Cargando calculadora...</div>}>

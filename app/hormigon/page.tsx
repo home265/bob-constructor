@@ -1,29 +1,59 @@
 import Link from "next/link";
 
-export default function HormigonIndex() {
-  const cards = [
-    { href: "/hormigon/base", title: "Base/Plateas" },
-    { href: "/hormigon/pilote", title: "Pilotes" },
-    { href: "/hormigon/columna", title: "Columnas" },
-    { href: "/hormigon/viga", title: "Vigas" },
-    { href: "/hormigon/losa", title: "Losa maciza" },
-    { href: "/hormigon/losa-premoldeada", title: "Losa premoldeada" },
-  ];
+const items = [
+  {
+    href: "/hormigon/base",
+    title: "Base de fundación",
+    desc: "Volumen, acero y materiales estimativos para bases."
+  },
+  {
+    href: "/hormigon/columna",
+    title: "Columna",
+    desc: "Sección, volumen y armado orientativo de columnas."
+  },
+  {
+    href: "/hormigon/losa",
+    title: "Losa maciza",
+    desc: "Espesor, volumen, acero y materiales para losa maciza."
+  },
+  {
+    href: "/hormigon/losa-premoldeada",
+    title: "Losa premoldeada",
+    desc: "Cálculo orientativo para sistemas premoldeados."
+  },
+  {
+    href: "/hormigon/pilote",
+    title: "Pilote",
+    desc: "Volumen y materiales para pilotes de hormigón."
+  },
+  {
+    href: "/hormigon/viga",
+    title: "Viga",
+    desc: "Cargas/esfuerzos típicos y materiales para vigas."
+  }
+];
 
+export default function HormigonHubPage() {
   return (
-    <section className="space-y-6">
-      <h1 className="text-2xl font-semibold">Hormigón armado</h1>
+    <section className="container mx-auto px-4 max-w-5xl space-y-6">
+      <div className="card p-4 space-y-2">
+        <h1 className="text-2xl font-semibold">Hormigón</h1>
+        <p className="text-sm text-foreground/70">
+          Elegí una calculadora. Los resultados son orientativos para presupuesto y deben ser verificados por un profesional.
+        </p>
+      </div>
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cards.map((c) => (
-          <Link
-            key={c.href}
-            href={c.href}
-            className="card p-4 hover:bg-[var(--muted)] transition"
-            aria-label={`Abrir ${c.title}`}
-          >
-            <div className="text-lg font-medium">{c.title}</div>
-            <div className="text-sm text-foreground/70">Abrir</div>
-          </Link>
+        {items.map((it) => (
+          <div key={it.href} className="card p-4 flex flex-col justify-between">
+            <div>
+              <div className="font-medium">{it.title}</div>
+              <div className="text-xs text-foreground/60 mt-1">{it.desc}</div>
+            </div>
+            <div className="mt-3">
+              <Link className="btn" href={it.href}>Abrir</Link>
+            </div>
+          </div>
         ))}
       </div>
     </section>

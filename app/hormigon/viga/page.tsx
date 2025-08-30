@@ -24,6 +24,18 @@ type ConcreteRow = {
 };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 
+// Inputs que guardamos en la partida (deep-link)
+type VigaInputs = {
+  L_m: number;
+  b_cm: number;
+  h_cm: number;
+  cover_cm: number;
+  concreteClassId: string;
+  wastePct: number;
+  long: { phi_mm: number; n_sup: number; n_inf: number; n_extra: number };
+  stirrups: { phi_mm: number; spacing_cm: number; hook_cm: number };
+};
+
 // Normalizador de unidad al tipo Unit del proyecto
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
@@ -103,33 +115,36 @@ function VigaCalculator() {
     return m;
   }, [rebarOpts]);
 
-  // Precargar desde deep-link (C)
+  // Precargar desde deep-link (C) — asíncrono y tipado
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = p?.inputs as any;
-    if (!inp) return;
-    if (typeof inp.L_m === "number") setL(inp.L_m);
-    if (typeof inp.b_cm === "number") setB(inp.b_cm);
-    if (typeof inp.h_cm === "number") setH(inp.h_cm);
-    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
-    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
-    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
-    if (inp.long) {
-      if (typeof inp.long.phi_mm === "number") setPhiLong(inp.long.phi_mm);
-      if (typeof inp.long.n_sup === "number") setNSup(inp.long.n_sup);
-      if (typeof inp.long.n_inf === "number") setNInf(inp.long.n_inf);
-      if (typeof inp.long.n_extra === "number") setNExt(inp.long.n_extra);
-    }
-    if (inp.stirrups) {
-      if (typeof inp.stirrups.phi_mm === "number") setPhiSt(inp.stirrups.phi_mm);
-      if (typeof inp.stirrups.spacing_cm === "number") setS(inp.stirrups.spacing_cm);
-      if (typeof inp.stirrups.hook_cm === "number") setHook(inp.stirrups.hook_cm);
-    }
-  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      const inp = (p?.inputs ?? undefined) as Partial<VigaInputs> | undefined;
+      if (!inp) return;
+      if (typeof inp.L_m === "number") setL(inp.L_m);
+      if (typeof inp.b_cm === "number") setB(inp.b_cm);
+      if (typeof inp.h_cm === "number") setH(inp.h_cm);
+      if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+      if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+      if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+      if (inp.long) {
+        if (typeof inp.long.phi_mm === "number") setPhiLong(inp.long.phi_mm);
+        if (typeof inp.long.n_sup === "number") setNSup(inp.long.n_sup);
+        if (typeof inp.long.n_inf === "number") setNInf(inp.long.n_inf);
+        if (typeof inp.long.n_extra === "number") setNExt(inp.long.n_extra);
+      }
+      if (inp.stirrups) {
+        if (typeof inp.stirrups.phi_mm === "number") setPhiSt(inp.stirrups.phi_mm);
+        if (typeof inp.stirrups.spacing_cm === "number") setS(inp.stirrups.spacing_cm);
+        if (typeof inp.stirrups.hook_cm === "number") setHook(inp.stirrups.hook_cm);
+      }
+    })();
+  }, [projectId, partidaId]);
 
-  // Cálculo
-  const res = C.calcViga({
+  // Cálculo (con fallback resistente)
+  const calc = (C as any).calcViga ?? (C as any).default ?? ((x: any) => x);
+  const res = calc({
     L_m: L,
     b_cm: b,
     h_cm: h,
@@ -137,17 +152,8 @@ function VigaCalculator() {
     concreteClassId: concreteId,
     wastePct: waste,
     rebarTable: rebarMap,
-    long: {
-      phi_mm: phiLong,
-      n_sup: nSup,
-      n_inf: nInf,
-      n_extra: nExt,
-    },
-    stirrups: {
-      phi_mm: phiSt,
-      spacing_cm: s,
-      hook_cm: hook,
-    },
+    long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
+    stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
   });
 
   // (B) Desglose opcional de hormigón según JSON
@@ -168,29 +174,31 @@ function VigaCalculator() {
       concBreakdown.agua_l = round2(vol * concRow.agua_l_por_m3);
   }
 
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
   // Salida (tabla)
   const rows: ResultRow[] = [];
   rows.push({
     label: "Sección",
-    qty: res?.dimensiones ? (`${res.dimensiones.b_cm}×${res.dimensiones.h_cm}` as any) : "",
+    qty: (`${b}×${h}` as any),
     unit: "cm",
   });
-  if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
-  if (res?.dimensiones?.L_m != null) rows.push({ label: "Largo", qty: res.dimensiones.L_m, unit: "m" });
+  if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: round2(res.area_seccion_m2), unit: "m²" });
+  if (res?.dimensiones?.L_m != null) rows.push({ label: "Largo", qty: round2(res.dimensiones.L_m), unit: "m" });
 
-  if (vol > 0) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (vol > 0) rows.push({ label: "Hormigón", qty: round2(vol), unit: "m³", hint: "Con desperdicio" });
 
-  if (res?.acero_total_kg != null) rows.push({ label: "Acero total", qty: res.acero_total_kg, unit: "kg" });
+  if (typeof res?.acero_total_kg === "number") rows.push({ label: "Acero total", qty: round2(res.acero_total_kg), unit: "kg" });
 
   if (res?.longitudinal) {
     const Lg = res.longitudinal;
     rows.push({
       label: `Longitudinal Φ${Lg.phi_mm} (${Lg.n_sup}+${Lg.n_inf}${Lg.n_extra ? `+${Lg.n_extra}` : ""})`,
-      qty: Lg.largo_total_m,
+      qty: round2(Lg.largo_total_m),
       unit: "m",
-      hint: `Unidad ${Lg.largo_unit_m} m`,
+      hint: `Unidad ${round2(Lg.largo_unit_m)} m`,
     });
-    rows.push({ label: `Peso long. Φ${Lg.phi_mm}`, qty: Lg.kg, unit: "kg" });
+    rows.push({ label: `Peso long. Φ${Lg.phi_mm}`, qty: round2(Lg.kg), unit: "kg" });
   }
 
   if (res?.estribos) {
@@ -203,11 +211,11 @@ function VigaCalculator() {
     });
     rows.push({
       label: "Largo total estribos",
-      qty: St.largo_total_m,
+      qty: round2(St.largo_total_m),
       unit: "m",
-      hint: `Unidad ${St.largo_unit_m} m`,
+      hint: `Unidad ${round2(St.largo_unit_m)} m`,
     });
-    rows.push({ label: `Peso estribos Φ${St.phi_mm}`, qty: St.kg, unit: "kg" });
+    rows.push({ label: `Peso estribos Φ${St.phi_mm}`, qty: round2(St.kg), unit: "kg" });
   }
 
   // Añadir desglose de hormigón a la tabla (si existe)
@@ -218,7 +226,6 @@ function VigaCalculator() {
   // Ítems para proyecto (materiales unificables, con Unit válido)
   const itemsForProject: MaterialRow[] = useMemo(() => {
     const out: MaterialRow[] = [];
-    const round2 = (n: number) => Math.round(n * 100) / 100;
 
     if (vol > 0) {
       out.push({
@@ -252,7 +259,7 @@ function VigaCalculator() {
     }
 
     return out;
-  }, [vol, res?.longitudinal?.kg, res?.estribos?.kg, res?.acero_total_kg, concreteId, JSON.stringify(concBreakdown)]);
+  }, [vol, res?.longitudinal?.kg, res?.escribos?.kg, res?.acero_total_kg, concreteId, JSON.stringify(concBreakdown)]);
 
   const defaultTitle = `Viga ${b}×${h} · L=${L} m`;
 
@@ -261,14 +268,14 @@ function VigaCalculator() {
     kind: "viga";
     title: string;
     materials: MaterialRow[];
-    inputs: any;
+    inputs: VigaInputs | any;
     outputs: Record<string, any>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const inputs = {
+    const inputs: VigaInputs = {
       L_m: L,
       b_cm: b,
       h_cm: h,
@@ -299,7 +306,7 @@ function VigaCalculator() {
   const handleEditFromBatch = (index: number) => {
     const it = batch[index];
     if (!it) return;
-    const inp = it.inputs || {};
+    const inp = (it.inputs || {}) as Partial<VigaInputs>;
     setL(inp.L_m ?? L);
     setB(inp.b_cm ?? b);
     setH(inp.h_cm ?? h);
@@ -339,7 +346,7 @@ function VigaCalculator() {
         wastePct: waste,
         long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
         stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
-      },
+      } satisfies VigaInputs,
       outputs: res as any,
       materials: itemsForProject,
     });
@@ -506,7 +513,9 @@ function VigaCalculator() {
         </div>
 
         {/* Resultado */}
-        <ResultTable title="Resultado" items={rows} />
+        <div className="card p-4 card--table">
+          <ResultTable title="Resultado" items={rows} />
+        </div>
       </div>
 
       {/* Deep-link: actualizar partida */}
@@ -519,24 +528,7 @@ function VigaCalculator() {
       ) : null}
 
       {/* Agregar al proyecto (unidad) */}
-      <AddToProject
-        kind="viga"
-        defaultTitle={defaultTitle}
-        items={itemsForProject}
-        raw={{
-          input: {
-            L_m: L,
-            b_cm: b,
-            h_cm: h,
-            cover_cm: cover,
-            concreteClassId: concreteId,
-            wastePct: waste,
-            long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
-            stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
-          },
-          result: res,
-        }}
-      />
+      <AddToProject kind="viga" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
 
       {/* (A) Lote local */}
       {batch.length > 0 && (

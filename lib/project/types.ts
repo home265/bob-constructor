@@ -17,15 +17,15 @@ export type PartidaKind =
   | "base" | "pilote" | "losa" | "losa_premoldeada" | "viga" | "columna"
   | "boceto_estructural"; // 👈 nuevo
 
-
 export interface Partida {
   id: string;                 // uuid
   kind: PartidaKind;
   title: string;              // “Muro 3×2.7 H10 común”
-  inputs: Record<string, any>;
-  outputs: Record<string, any>;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
   materials: MaterialLine[];  // normalizado para sumar
   createdAt: number;
+  updatedAt: number;          // 👈 necesario para ordenar por recientes
 }
 
 export interface Project {
@@ -44,7 +44,7 @@ export interface Project {
   updatedAt: number;
 }
 
-/** Opcional: para crear un proyecto desde el UI */
+/** Para crear un proyecto desde el UI (opcional) */
 export type NewProject = {
   name: string;
   client?: string;
@@ -56,7 +56,24 @@ export type NewProject = {
   unitSystem?: "metric";
 };
 
-/** Opcional: para listados */
+/** Para listados (opcional) */
 export type ProjectListItem = Pick<Project, "id" | "name" | "updatedAt"> & {
   partesCount?: number;
 };
+
+/** Payload estándar para guardar/actualizar una partida */
+export interface SavePartidaPayload {
+  title: string;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  materials: MaterialLine[];
+}
+
+/** Para componentes que guardan lote */
+export interface BatchItem {
+  kind: PartidaKind | string;
+  title: string;
+  materials: MaterialLine[];
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+}

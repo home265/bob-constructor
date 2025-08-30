@@ -24,6 +24,17 @@ type ConcreteRow = {
 };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 
+// Inputs guardados en la partida (para deep-link)
+type PiloteInputs = {
+  L_m: number;
+  d_cm: number;
+  cover_cm: number;
+  concreteClassId: string;
+  wastePct: number;
+  long: { phi_mm: number; n: number };
+  spiral: { phi_mm: number; pitch_cm: number; extra_m: number };
+};
+
 // Unit normalizer (por si el mapper devuelve variantes)
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
@@ -36,7 +47,6 @@ function normalizeUnit(u: string): Unit {
 }
 
 function PiloteCalculator() {
-  // Deep-link (C)
   const sp = useSearchParams();
   const projectId = sp.get("projectId");
   const partidaId = sp.get("partidaId");
@@ -77,9 +87,9 @@ function PiloteCalculator() {
 
   // Estado
   const [concreteId, setConcreteId] = useState<string>(concreteOpts[0]?.key ?? "H25");
-  const [L, setL] = useState(6);      // m
-  const [d, setD] = useState(40);     // cm
-  const [cover, setCover] = useState(5); // cm
+  const [L, setL] = useState(6);        // m
+  const [d, setD] = useState(40);       // cm
+  const [cover, setCover] = useState(5);// cm
   const [waste, setWaste] = useState(8); // %
 
   // Longitudinales
@@ -91,27 +101,29 @@ function PiloteCalculator() {
   const [pitch, setPitch] = useState(10);  // cm
   const [extra, setExtra] = useState(0.2); // m
 
-  // Precargar si venimos por deep-link (C)
+  // Deep-link (asíncrono + tipado)
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = p?.inputs as any;
-    if (!inp) return;
-    if (typeof inp.L_m === "number") setL(inp.L_m);
-    if (typeof inp.d_cm === "number") setD(inp.d_cm);
-    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
-    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
-    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
-    if (inp.long) {
-      if (typeof inp.long.phi_mm === "number") setPhiL(inp.long.phi_mm);
-      if (typeof inp.long.n === "number") setNL(inp.long.n);
-    }
-    if (inp.spiral) {
-      if (typeof inp.spiral.phi_mm === "number") setPhiS(inp.spiral.phi_mm);
-      if (typeof inp.spiral.pitch_cm === "number") setPitch(inp.spiral.pitch_cm);
-      if (typeof inp.spiral.extra_m === "number") setExtra(inp.spiral.extra_m);
-    }
-  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      const inp = (p?.inputs ?? undefined) as Partial<PiloteInputs> | undefined;
+      if (!inp) return;
+      if (typeof inp.L_m === "number") setL(inp.L_m);
+      if (typeof inp.d_cm === "number") setD(inp.d_cm);
+      if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+      if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+      if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+      if (inp.long) {
+        if (typeof inp.long.phi_mm === "number") setPhiL(inp.long.phi_mm);
+        if (typeof inp.long.n === "number") setNL(inp.long.n);
+      }
+      if (inp.spiral) {
+        if (typeof inp.spiral.phi_mm === "number") setPhiS(inp.spiral.phi_mm);
+        if (typeof inp.spiral.pitch_cm === "number") setPitch(inp.spiral.pitch_cm);
+        if (typeof inp.spiral.extra_m === "number") setExtra(inp.spiral.extra_m);
+      }
+    })();
+  }, [projectId, partidaId]);
 
   // Tablas → map
   const rebarMap = useMemo(() => {
@@ -120,8 +132,9 @@ function PiloteCalculator() {
     return m;
   }, [rebarOpts]);
 
-  // Cálculo
-  const res = C.calcPilote({
+  // Cálculo (fallback resistente)
+  const calc = (C as any).calcPilote ?? (C as any).default ?? ((x: any) => x);
+  const res = calc({
     L_m: L,
     d_cm: d,
     cover_cm: cover,
@@ -132,18 +145,18 @@ function PiloteCalculator() {
     spiral: { phi_mm: phiS, pitch_cm: pitch, extra_m: extra },
   });
 
-  // (B) Desglose opcional del hormigón (si tu JSON trae coeficientes por m³)
+  // (B) Desglose del hormigón (si tu JSON trae coeficientes por m³)
+  const round2 = (n: number) => Math.round(n * 100) / 100;
   const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3 ?? 0;
   const concRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
   const concBreakdown: Record<string, number> = {};
   if (vol > 0 && concRow) {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
     const bolsas = concRow.bolsas_cemento_por_m3 ?? concRow.cemento_bolsas_por_m3;
     if (typeof bolsas === "number") concBreakdown.cemento_bolsas = round2(vol * bolsas);
     if (typeof concRow.cemento_kg_por_m3 === "number")
       concBreakdown.cemento_kg = round2(vol * concRow.cemento_kg_por_m3);
-    const arena = concRow.arena_m3_por_m3;
-    if (typeof arena === "number") concBreakdown.arena_m3 = round2(vol * arena);
+    if (typeof concRow.arena_m3_por_m3 === "number")
+      concBreakdown.arena_m3 = round2(vol * concRow.arena_m3_por_m3);
     const grava = concRow.grava_m3_por_m3 ?? concRow.piedra_m3_por_m3;
     if (typeof grava === "number") concBreakdown.piedra_m3 = round2(vol * grava);
     if (typeof concRow.agua_l_por_m3 === "number")
@@ -154,34 +167,34 @@ function PiloteCalculator() {
   const rows: ResultRow[] = [];
   rows.push({ label: "Diámetro", qty: d, unit: "cm" });
   rows.push({ label: "Largo", qty: L, unit: "m" });
-  if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
+  if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: round2(res.area_seccion_m2), unit: "m²" });
 
-  if (vol > 0) rows.push({ label: "Hormigón", qty: vol, unit: "m³", hint: "Con desperdicio" });
+  if (vol > 0) rows.push({ label: "Hormigón", qty: round2(vol), unit: "m³", hint: "Con desperdicio" });
 
   if (res?.longitudinal) {
     const Lg = res.longitudinal;
     rows.push({
       label: `Longitudinal Φ${Lg.phi_mm}`,
-      qty: Lg.largo_total_m,
+      qty: round2(Lg.largo_total_m),
       unit: "m",
-      hint: `${Lg.n} uds · unidad ${Lg.largo_unit_m} m`,
+      hint: `${Lg.n} uds · unidad ${round2(Lg.largo_unit_m)} m`,
     });
-    rows.push({ label: `Peso long. Φ${Lg.phi_mm}`, qty: Lg.kg, unit: "kg" });
+    rows.push({ label: `Peso long. Φ${Lg.phi_mm}`, qty: round2(Lg.kg), unit: "kg" });
   }
 
   if (res?.espiral) {
     const Sp = res.espiral;
     rows.push({
       label: `Espiral Φ${Sp.phi_mm}`,
-      qty: Sp.largo_total_m,
+      qty: round2(Sp.largo_total_m),
       unit: "m",
-      hint: `paso ${Sp.pitch_cm} cm · ~${Sp.vueltas} vueltas`,
+      hint: `paso ${Sp.pitch_cm} cm · ~${round2(Sp.vueltas) } vueltas`,
     });
-    rows.push({ label: `Peso espiral Φ${Sp.phi_mm}`, qty: Sp.kg, unit: "kg" });
+    rows.push({ label: `Peso espiral Φ${Sp.phi_mm}`, qty: round2(Sp.kg), unit: "kg" });
   }
 
   if (res?.acero_total_kg != null) {
-    rows.push({ label: "Acero total", qty: res.acero_total_kg, unit: "kg" });
+    rows.push({ label: "Acero total", qty: round2(res.acero_total_kg), unit: "kg" });
   }
 
   // Añadir desglose del hormigón a la tabla (si existe)
@@ -189,10 +202,9 @@ function PiloteCalculator() {
     rows.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
   }
 
-  // Materiales para "Agregar al proyecto" (Unit válido)
+  // Materiales para "Agregar al proyecto"
   const itemsForProject: MaterialRow[] = useMemo(() => {
     const out: MaterialRow[] = [];
-    const round2 = (n: number) => Math.round(n * 100) / 100;
 
     if (vol > 0) {
       out.push({
@@ -237,14 +249,14 @@ function PiloteCalculator() {
     kind: "pilote";
     title: string;
     materials: MaterialRow[];
-    inputs: any;
+    inputs: PiloteInputs | any;
     outputs: Record<string, any>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const inputs = {
+    const inputs: PiloteInputs = {
       L_m: L,
       d_cm: d,
       cover_cm: cover,
@@ -274,7 +286,7 @@ function PiloteCalculator() {
   const handleEditFromBatch = (index: number) => {
     const it = batch[index];
     if (!it) return;
-    const inp = it.inputs || {};
+    const inp = (it.inputs || {}) as Partial<PiloteInputs>;
     setL(inp.L_m ?? L);
     setD(inp.d_cm ?? d);
     setCover(inp.cover_cm ?? cover);
@@ -310,7 +322,7 @@ function PiloteCalculator() {
         wastePct: waste,
         long: { phi_mm: phiL, n: nL },
         spiral: { phi_mm: phiS, pitch_cm: pitch, extra_m: extra },
-      },
+      } satisfies PiloteInputs,
       outputs: res as any,
       materials: itemsForProject,
     });
@@ -507,8 +519,7 @@ function PiloteCalculator() {
   );
 }
 
-// Este es el componente de página que se exporta por defecto.
-// Envuelve el calculador en <Suspense> para evitar el error de build.
+// Page
 export default function PilotePage() {
   return (
     <Suspense fallback={<div>Cargando calculadora...</div>}>

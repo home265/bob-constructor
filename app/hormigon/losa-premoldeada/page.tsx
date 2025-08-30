@@ -24,6 +24,20 @@ type ConcreteRow = {
   agua_l_por_m3?: number;
 };
 
+// Inputs guardados en la partida (tipado fuerte)
+type LosaPremoldeadaInputs = {
+  L_m: number;
+  W_m: number;
+  spacing_cm: number;
+  apoyo_cm: number;
+  largo_bloque_m: number;
+  capa_cm: number;
+  wastePct: number;
+  mallaId?: string;
+  meshDoubleLayer?: boolean;
+  concreteClassId: string;
+};
+
 // helper Unit → Project
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
@@ -85,26 +99,31 @@ function LosaPremoldeadaCalculator() {
   // clase de hormigón para la capa (para desglose B)
   const [concreteId, setConcreteId] = useState(concreteOpts[1]?.key ?? "H21");
 
-  // (C) Precarga si deep-link
+  // (C) Precarga si deep-link — ahora asíncrona y tipada
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = p?.inputs as any;
-    if (!inp) return;
-    if (typeof inp.L_m === "number") setL(inp.L_m);
-    if (typeof inp.W_m === "number") setW(inp.W_m);
-    if (typeof inp.spacing_cm === "number") setS(inp.spacing_cm);
-    if (typeof inp.apoyo_cm === "number") setApoyo(inp.apoyo_cm);
-    if (typeof inp.largo_bloque_m === "number") setLBloque(inp.largo_bloque_m);
-    if (typeof inp.capa_cm === "number") setCapa(inp.capa_cm);
-    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
-    if (typeof inp.mallaId === "string") {
-      setUsaMalla(!!inp.mallaId);
-      setMeshId(inp.mallaId);
-    }
-    if (typeof inp.meshDoubleLayer === "boolean") setMeshDouble(inp.meshDoubleLayer);
-    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
-  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      const inp = (p?.inputs ?? undefined) as Partial<LosaPremoldeadaInputs> | undefined;
+      if (!inp) return;
+
+      if (typeof inp.L_m === "number") setL(inp.L_m);
+      if (typeof inp.W_m === "number") setW(inp.W_m);
+      if (typeof inp.spacing_cm === "number") setS(inp.spacing_cm);
+      if (typeof inp.apoyo_cm === "number") setApoyo(inp.apoyo_cm);
+      if (typeof inp.largo_bloque_m === "number") setLBloque(inp.largo_bloque_m);
+      if (typeof inp.capa_cm === "number") setCapa(inp.capa_cm);
+      if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+      if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+
+      const hasMesh = typeof inp.mallaId === "string" && inp.mallaId !== "";
+      setUsaMalla(hasMesh);
+      if (hasMesh) {
+        setMeshId(inp.mallaId!);
+        setMeshDouble(!!inp.meshDoubleLayer);
+      }
+    })();
+  }, [projectId, partidaId]);
 
   const meshMap = useMemo(() => {
     const m: Record<string, { kg_m2?: number; label?: string }> = {};
@@ -112,7 +131,13 @@ function LosaPremoldeadaCalculator() {
     return m;
   }, [meshOpts]);
 
-  const res = C.calcLosaPremoldeada({
+  // Fallback a default si cambia la export
+  const calc =
+    (C as any).calcLosaPremoldeada ??
+    (C as any).default ??
+    ((x: any) => x);
+
+  const res = calc({
     L_m: L,
     W_m: W,
     spacing_cm: s,
@@ -126,17 +151,17 @@ function LosaPremoldeadaCalculator() {
   });
 
   // (B) Desglose hormigón de la capa
+  const round2 = (n: number) => Math.round(n * 100) / 100;
   const capaVol = (res?.capa?.volumen_con_desperdicio_m3 ?? res?.capa?.volumen_m3) || 0;
   const concRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
   const matBreakdown: Record<string, number> = {};
   if (capaVol > 0 && concRow) {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
     const bolsas = concRow.bolsas_cemento_por_m3 ?? concRow.cemento_bolsas_por_m3;
     if (typeof bolsas === "number") matBreakdown.cemento_bolsas = round2(capaVol * bolsas);
     if (typeof concRow.cemento_kg_por_m3 === "number")
       matBreakdown.cemento_kg = round2(capaVol * concRow.cemento_kg_por_m3);
-    const arena = concRow.arena_m3_por_m3;
-    if (typeof arena === "number") matBreakdown.arena_m3 = round2(capaVol * arena);
+    if (typeof concRow.arena_m3_por_m3 === "number")
+      matBreakdown.arena_m3 = round2(capaVol * concRow.arena_m3_por_m3);
     const grava = concRow.grava_m3_por_m3 ?? concRow.piedra_m3_por_m3;
     if (typeof grava === "number") matBreakdown.piedra_m3 = round2(capaVol * grava);
     if (typeof concRow.agua_l_por_m3 === "number")
@@ -145,14 +170,16 @@ function LosaPremoldeadaCalculator() {
 
   // Tabla resultado
   const rows: ResultRow[] = [];
-  rows.push({ label: "Área", qty: res.area_m2, unit: "m²" });
-  rows.push({
-    label: "Viguetas",
-    qty: res.viguetas.qty,
-    unit: "ud",
-    hint: `largo unit. ${res.viguetas.largo_unit_m} m (total ${res.viguetas.largo_total_m} m)`,
-  });
-  if (res.bloques) {
+  rows.push({ label: "Área", qty: round2(res?.area_m2 ?? 0), unit: "m²" });
+  if (res?.viguetas) {
+    rows.push({
+      label: "Viguetas",
+      qty: res.viguetas.qty,
+      unit: "ud",
+      hint: `largo unit. ${res.viguetas.largo_unit_m} m (total ${round2(res.viguetas.largo_total_m ?? 0)} m)`,
+    });
+  }
+  if (res?.bloques) {
     rows.push({
       label: "Bloques",
       qty: res.bloques.qty,
@@ -160,21 +187,22 @@ function LosaPremoldeadaCalculator() {
       hint: `${res.bloques.por_vigueta} por vigueta · largo ${res.bloques.largo_unit_m} m`,
     });
   }
-  rows.push({
-    label: "Capa de compresión (hormigón)",
-    qty: capaVol,
-    unit: "m³",
-    hint: `espesor ${res.capa.espesor_cm} cm (con desperdicio)`,
-  });
-  if (res.malla) {
+  if (res?.capa) {
+    rows.push({
+      label: "Capa de compresión (hormigón)",
+      qty: round2(capaVol),
+      unit: "m³",
+      hint: `espesor ${res.capa.espesor_cm} cm (con desperdicio)`,
+    });
+  }
+  if (res?.malla) {
     rows.push({
       label: `Malla ${res.malla.id}`,
-      qty: res.malla.kg,
+      qty: round2(res.malla.kg ?? 0),
       unit: "kg",
       hint: res.malla.capas === 2 ? "2 capas" : "1 capa",
     });
   }
-  // Añadimos desglose de la capa
   for (const [k, v] of Object.entries(matBreakdown)) {
     rows.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
   }
@@ -182,7 +210,6 @@ function LosaPremoldeadaCalculator() {
   // Ítems para proyecto
   const itemsForProject: MaterialRow[] = useMemo(() => {
     const out: MaterialRow[] = [];
-    const round2 = (n: number) => Math.round(n * 100) / 100;
 
     if (capaVol > 0) {
       out.push({
@@ -192,7 +219,7 @@ function LosaPremoldeadaCalculator() {
         unit: "m3",
       });
     }
-    if (res.malla && typeof res.malla.kg === "number" && res.malla.kg > 0) {
+    if (res?.malla && typeof res.malla.kg === "number" && res.malla.kg > 0) {
       out.push({
         key: `malla_${res.malla.id ?? "sima"}`,
         label: `Malla ${res.malla.id}${meshDouble ? " (2 capas)" : ""}`,
@@ -204,7 +231,7 @@ function LosaPremoldeadaCalculator() {
     if (vigQty > 0) {
       out.push({
         key: "viguetas_premoldeadas",
-        label: `Viguetas premoldeadas ${res.viguetas!.largo_unit_m} m`,
+        label: `Viguetas premoldeadas ${res?.viguetas?.largo_unit_m ?? 0} m`,
         qty: vigQty,
         unit: "u",
       });
@@ -218,7 +245,6 @@ function LosaPremoldeadaCalculator() {
         unit: "u",
       });
     }
-    // desglose de materiales del hormigón de la capa
     for (const [k, v] of Object.entries(matBreakdown)) {
       out.push({
         key: k,
@@ -237,14 +263,14 @@ function LosaPremoldeadaCalculator() {
     kind: "losa_premoldeada";
     title: string;
     materials: MaterialRow[];
-    inputs: any;
+    inputs: LosaPremoldeadaInputs;
     outputs: Record<string, any>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const inputs = {
+    const inputs: LosaPremoldeadaInputs = {
       L_m: L,
       W_m: W,
       spacing_cm: s,
@@ -277,7 +303,7 @@ function LosaPremoldeadaCalculator() {
   const handleEditFromBatch = (index: number) => {
     const it = batch[index];
     if (!it) return;
-    const inp = it.inputs || {};
+    const inp = (it.inputs || {}) as Partial<LosaPremoldeadaInputs>;
     setL(inp.L_m ?? L);
     setW(inp.W_m ?? W);
     setS(inp.spacing_cm ?? s);
@@ -289,7 +315,7 @@ function LosaPremoldeadaCalculator() {
     const hasMesh = typeof inp.mallaId === "string" && inp.mallaId !== "";
     setUsaMalla(hasMesh);
     if (hasMesh) {
-      setMeshId(inp.mallaId);
+      setMeshId(inp.mallaId!);
       setMeshDouble(!!inp.meshDoubleLayer);
     }
     setEditIndex(index);
@@ -316,7 +342,7 @@ function LosaPremoldeadaCalculator() {
         mallaId: usaMalla ? meshId : "",
         meshDoubleLayer: meshDouble,
         concreteClassId: concreteId,
-      },
+      } satisfies LosaPremoldeadaInputs,
       outputs: res as any,
       materials: itemsForProject,
     });
@@ -465,8 +491,7 @@ function LosaPremoldeadaCalculator() {
   );
 }
 
-// Este es el componente de página que se exporta por defecto.
-// Envuelve el calculador en <Suspense> para evitar el error de build.
+// Page
 export default function LosaPremoldeadaPage() {
   return (
     <Suspense fallback={<div>Cargando calculadora...</div>}>

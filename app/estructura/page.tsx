@@ -46,21 +46,23 @@ function EstructuraCalculator() {
   const [usoKey, setUsoKey] = useState<OpcionUso["key"]>("vivienda");
   const [techoKey, setTechoKey] = useState<OpcionTecho["key"]>("losa10");
 
-  // Precargar desde partida (C)
+  // Precargar desde partida (C) — async
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = (p?.inputs ?? {}) as any;
-    if (!inp) return;
-    if (typeof inp.Lx === "number") setLx(inp.Lx);
-    if (typeof inp.Ly === "number") setLy(inp.Ly);
-    if (typeof inp.nx === "number") setNx(inp.nx);
-    if (typeof inp.ny === "number") setNy(inp.ny);
-    if (typeof inp.plantas === "number") setPlantas(inp.plantas);
-    if (typeof inp.espLosa_cm === "number") setEspLosa(inp.espLosa_cm);
-    if (typeof inp.gAcabados === "number") setGAcabados(inp.gAcabados);
-    if (typeof inp.usoKey === "string") setUsoKey(inp.usoKey);
-    if (typeof inp.techoKey === "string") setTechoKey(inp.techoKey);
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      const inp = (p?.inputs ?? {}) as Record<string, unknown>;
+      if (!inp) return;
+      if (typeof inp.Lx === "number") setLx(inp.Lx);
+      if (typeof inp.Ly === "number") setLy(inp.Ly);
+      if (typeof inp.nx === "number") setNx(inp.nx);
+      if (typeof inp.ny === "number") setNy(inp.ny);
+      if (typeof inp.plantas === "number") setPlantas(inp.plantas);
+      if (typeof inp.espLosa_cm === "number") setEspLosa(inp.espLosa_cm);
+      if (typeof inp.gAcabados === "number") setGAcabados(inp.gAcabados);
+      if (typeof inp.usoKey === "string") setUsoKey(inp.usoKey);
+      if (typeof inp.techoKey === "string") setTechoKey(inp.techoKey);
+    })();
   }, [projectId, partidaId]);
 
   // Derivados
@@ -121,7 +123,7 @@ function EstructuraCalculator() {
 
   const defaultTitle = `Boceto ${Lx}×${Ly} m · grilla ${nx}×${ny} · ${plantas} plantas`;
 
-  const raw = {
+  const raw: Record<string, unknown> = {
     Lx, Ly, nx, ny, plantas, usoKey, techoKey,
     espLosa_cm, gAcabados,
     gLosa, gTotalPiso, gTotalTecho,
@@ -132,7 +134,7 @@ function EstructuraCalculator() {
   };
 
   // ---------- (A) Lote local ----------
-  type BatchItem = {
+  type Batch = {
     kind: "boceto_estructural";
     title: string;
     materials: MaterialRow[];
@@ -140,14 +142,14 @@ function EstructuraCalculator() {
       Lx: number; Ly: number; nx: number; ny: number; plantas: number;
       usoKey: string; techoKey: string; espLosa_cm: number; gAcabados: number;
     };
-    outputs: Record<string, any>;
+    outputs: Record<string, unknown>;
   };
-  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [batch, setBatch] = useState<Batch[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
     const inputs = { Lx, Ly, nx, ny, plantas, usoKey, techoKey, espLosa_cm, gAcabados };
-    const item: BatchItem = {
+    const item: Batch = {
       kind: "boceto_estructural",
       title: defaultTitle,
       materials: itemsForProject,
@@ -186,9 +188,9 @@ function EstructuraCalculator() {
   };
 
   // ---------- (C) Actualizar partida ----------
-  const handleUpdatePartida = () => {
+  const handleUpdatePartida = async () => {
     if (!projectId || !partidaId) return;
-    updatePartida(projectId, partidaId, {
+    await updatePartida(projectId, partidaId, {
       title: defaultTitle,
       inputs: { Lx, Ly, nx, ny, plantas, usoKey, techoKey, espLosa_cm, gAcabados },
       outputs: raw,

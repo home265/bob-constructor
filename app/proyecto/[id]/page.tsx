@@ -1,9 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getProject, removePartida } from "@/lib/project/storage";
+import { getProject, removePartidaByKind } from "@/lib/project/storage";
 import { aggregateMaterials } from "@/lib/project/compute";
-import type { Project } from "@/lib/project/types";
+import type { Project as DBProject, Partida as DBPartida } from "@/lib/db";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 function downloadText(filename: string, text: string, mime = "text/plain;charset=utf-8") {
@@ -37,32 +37,45 @@ export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const projectMaybe = getProject(id);
-  if (!projectMaybe) {
-    if (typeof window !== "undefined") router.replace("/proyecto");
-    return null;
-  }
-  const p: Project = projectMaybe;
+  const [project, setProject] = useState<DBProject | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const mat = aggregateMaterials(p);
-  const safeName = p.name.replace(/[^\w\-]+/g, "_").toLowerCase();
+  // carga inicial
+  useEffect(() => {
+    (async () => {
+      const p = await getProject(id);
+      if (!p) {
+        router.replace("/proyecto");
+        return;
+      }
+      setProject(p);
+      setLoading(false);
+    })();
+  }, [id, router]);
 
-  // --- compartir / exportar ---
+  // materiales agregados (se recalcula al cambiar project)
+  const mat = useMemo(() => (project ? aggregateMaterials(project) : []), [project]);
+  const safeName = useMemo(
+    () => (project ? project.name.replace(/[^\w\-]+/g, "_").toLowerCase() : "proyecto"),
+    [project]
+  );
+
+  // compartir / exportar
   async function onShare() {
+    if (!project) return;
     const text =
-`Proyecto: ${p.name}
-Cliente: ${p.client || "-"}
-Obra: ${p.siteAddress || "-"}
-Partidas: ${p.partes.length}
+`Proyecto: ${project.name}
+Cliente: ${project.client || "-"}
+Obra: ${project.siteAddress || "-"}
+Partidas: ${project.partes.length}
 Materiales: ${mat.length} ítems
 
 Resumen:
 ${mat.slice(0, 12).map(m => `• ${m.label}: ${m.qty} ${m.unit}`).join("\n")}
 ${mat.length > 12 ? "…" : ""}`;
-
-    const navAny = navigator as any;
-    if (navAny.share) {
-      try { await navAny.share({ title: `Presupuesto - ${p.name}`, text }); } catch {}
+    const navShare = (navigator as unknown as { share?: (data: { title?: string; text?: string }) => Promise<void> });
+    if (navShare.share) {
+      try { await navShare.share({ title: `Presupuesto - ${project.name}`, text }); } catch {}
     } else {
       const msg = encodeURIComponent(text);
       window.open(`https://wa.me/?text=${msg}`, "_blank");
@@ -71,43 +84,47 @@ ${mat.length > 12 ? "…" : ""}`;
 
   function onExportCSV() {
     const header = "key,label,qty,unit";
-    const rows = mat.map(m =>
-      [m.key, m.label.replace(/,/g, " "), m.qty, m.unit].join(",")
-    );
+    const rows = mat.map(m => [m.key, m.label.replace(/,/g, " "), m.qty, m.unit].join(","));
     const csv = [header, ...rows].join("\n");
     downloadText(`materiales_${safeName}.csv`, csv, "text/csv;charset=utf-8");
   }
 
   function onExportJSON() {
-    downloadText(`proyecto_${safeName}.json`, JSON.stringify(p, null, 2), "application/json");
+    if (!project) return;
+    downloadText(`proyecto_${safeName}.json`, JSON.stringify(project, null, 2), "application/json");
   }
 
-  // --- edición / eliminación ---
+  // confirmación de eliminación
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [toDelete, setToDelete] = useState<{ partidaId: string; title: string } | null>(null);
+  const [toDelete, setToDelete] = useState<{ partidaId: string; kind: string; title: string } | null>(null);
 
   const makeEditHref = (kind: string, partidaId: string) => {
     const base = KIND_ROUTES[kind] ?? `/${kind}`;
-    const sp = new URLSearchParams({ projectId: p.id, partidaId });
+    const sp = new URLSearchParams({ projectId: id, partidaId });
     return `${base}?${sp.toString()}`;
   };
 
-  const partidasUI = useMemo(() => p.partes, [p.partes]);
+  const partidasUI = useMemo<DBPartida[]>(() => project?.partes ?? [], [project]);
+
+  if (loading) {
+    return <section className="space-y-6"><p className="text-sm text-foreground/60">Cargando proyecto…</p></section>;
+  }
+  if (!project) return null;
 
   return (
     <section className="space-y-6 container mx-auto px-4 max-w-5xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{p.name}</h1>
+          <h1 className="text-2xl font-semibold">{project.name}</h1>
           <div className="text-sm text-foreground/60">
-            {p.client ? `Cliente: ${p.client} · ` : ""}{p.siteAddress || ""}
+            {project.client ? `Cliente: ${project.client} · ` : ""}{project.siteAddress || ""}
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="btn" onClick={() => router.push(`/proyecto/${p.id}/export`)}>Imprimir / PDF</button>
-          <button className="btn-secondary" onClick={onExportCSV}>Descargar CSV</button>
-          <button className="btn-secondary" onClick={onExportJSON}>Descargar JSON</button>
-          <button className="btn" onClick={onShare}>Compartir</button>
+          <button className="btn btn-primary" onClick={() => router.push(`/proyecto/${project.id}/export`)}>Imprimir / PDF</button>
+          <button className="btn btn-secondary" onClick={onExportCSV}>Descargar CSV</button>
+          <button className="btn btn-secondary" onClick={onExportJSON}>Descargar JSON</button>
+          <button className="btn btn-ghost" onClick={onShare}>Compartir</button>
         </div>
       </div>
 
@@ -127,15 +144,15 @@ ${mat.length > 12 ? "…" : ""}`;
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      className="btn-secondary"
+                      className="btn btn-secondary"
                       onClick={() => router.push(makeEditHref(part.kind, part.id))}
                       title="Editar (abrir calculadora con esta partida)"
                     >
                       Editar
                     </button>
                     <button
-                      className="btn-danger"
-                      onClick={() => { setToDelete({ partidaId: part.id, title: part.title }); setConfirmOpen(true); }}
+                      className="btn btn-ghost"
+                      onClick={() => { setToDelete({ partidaId: part.id, kind: part.kind, title: part.title }); setConfirmOpen(true); }}
                     >
                       Eliminar
                     </button>
@@ -176,22 +193,25 @@ ${mat.length > 12 ? "…" : ""}`;
 
       {/* Confirmación de eliminación */}
       <ConfirmDialog
-  open={confirmOpen}
-  title="Eliminar partida"
-  message={toDelete ? `¿Seguro que querés eliminar “${toDelete.title}” del proyecto?` : ""}
-  confirmLabel="Eliminar"
-  cancelLabel="Cancelar"
-  onConfirm={() => {
-    if (toDelete) {
-      removePartida(p.id, toDelete.partidaId);
-      setConfirmOpen(false);
-      setToDelete(null);
-      location.reload();
-    }
-  }}
-  onCancel={() => { setConfirmOpen(false); setToDelete(null); }}
-/>
-
+        open={confirmOpen}
+        title="Eliminar partida"
+        message={toDelete ? `¿Seguro que querés eliminar “${toDelete.title}” del proyecto?` : ""}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={async () => {
+          if (!toDelete || !project) return;
+          await removePartidaByKind(project.id, toDelete.kind);
+          // actualizamos el estado local sin recargar
+          setProject({
+            ...project,
+            partes: project.partes.filter(pt => pt.id !== toDelete.partidaId),
+            updatedAt: Date.now(),
+          });
+          setConfirmOpen(false);
+          setToDelete(null);
+        }}
+        onCancel={() => { setConfirmOpen(false); setToDelete(null); }}
+      />
     </section>
   );
 }

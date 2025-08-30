@@ -2,49 +2,63 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useJson } from "@/lib/data/useJson";
-// @ts-ignore – desacoplado de la firma exacta de la función de cálculo
 import * as C from "@/lib/calc/carpeta";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import AddToProject from "@/components/ui/AddToProject";
 import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
 import BatchList from "@/components/ui/BatchList";
-import type { MaterialRow, Unit } from "@/lib/project/types";
+import type { MaterialRow } from "@/lib/project/types";
+import { toUnit } from "@/lib/project/helpers";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 
-// ---------- helpers de unidades p/ MaterialRow ----------
-const normalizeUnit = (u?: string): Unit => {
-  if (!u) return "u";
-  if (u === "m²") return "m2";
-  if (u === "m³") return "m3";
-  if (u.toLowerCase() === "bolsas") return "u";
-  const ok: Unit[] = ["u", "m", "m2", "m3", "kg", "l"];
-  return (ok.includes(u as Unit) ? (u as Unit) : "u");
-};
-
-// Forma real de tu JSON: { mezclas: [{id,label}], hidrofugo: boolean | array }
+/* ----------------------------- Tipos de datos ----------------------------- */
 type CarpetaOptionsFile = {
   mezclas?: { id?: string; label?: string }[];
   hidrofugo?: boolean | { key?: string; label?: string }[];
 };
-type MixMap = any;
-type Morteros = Record<string, any>;
+
+type MixMap = Record<string, string | Record<string, string>>;
+
+type MortarDef = {
+  id?: string;
+  bolsas_cemento_por_m3?: number;
+  kg_cal_por_m3?: number;
+  agua_l_por_m3?: number;
+  arena_m3_por_m3?: number;
+  proporcion?: { cemento?: number; cal?: number; arena?: number };
+};
+
+type Morteros = MortarDef[] | Record<string, MortarDef>;
+
+type CarpetaResult = {
+  area_m2?: number;
+  espesor_cm?: number;
+  volumen_m3?: number;
+  volumen_con_desperdicio_m3?: number;
+  mortero_id?: string;
+  materiales?: Record<string, number>;
+  [k: string]: unknown;
+};
+
+type SavedInputs = {
+  tipo: string;
+  hidro: string;
+  L: number;
+  A: number;
+  H: number;     // cm
+  waste: number; // %
+};
 
 type BatchItem = {
   kind: "carpeta";
   title: string;
   materials: MaterialRow[];
-  inputs: {
-    tipo: string;
-    hidro: string;
-    L: number;
-    A: number;
-    H: number;        // cm
-    waste: number;    // %
-  };
-  outputs: Record<string, any>;
+  inputs: SavedInputs;
+  outputs: Record<string, unknown>;
 };
 
+/* ------------------------------- Componente ------------------------------- */
 function CarpetaCalculator() {
   const options = useJson<CarpetaOptionsFile>("/data/carpeta_options.json", {
     mezclas: [
@@ -54,13 +68,13 @@ function CarpetaCalculator() {
     ],
     hidrofugo: true,
   });
-  const mixMap = useJson<MixMap>("/data/carpeta_mix_map.json", []);
+  const mixMap = useJson<MixMap>("/data/carpeta_mix_map.json", {});
   const morteros = useJson<Morteros>("/data/mortars.json", {});
 
   // deep-link edición (?projectId & ?partidaId)
   const search = useSearchParams();
-  const projectId = search.get("projectId") || undefined;
-  const partidaId = search.get("partidaId") || undefined;
+  const projectId = search.get("projectId");
+  const partidaId = search.get("partidaId");
   const isEditMode = !!(projectId && partidaId);
 
   // Normalizo "mezclas" -> tipos {key,label}
@@ -101,20 +115,20 @@ function CarpetaCalculator() {
   const [H, setH] = useState(3); // cm
   const [waste, setWaste] = useState(10);
 
-  // Precargar si viene ?projectId&partidaId
+  // Precargar si viene ?projectId&partidaId (async)
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const part = getPartida(projectId, partidaId);
-    if (!part) return;
-    // Precargar inputs que guardamos en la partida
-    const inp = part.inputs || {};
-    if (typeof inp.tipo === "string") setTipo(inp.tipo);
-    if (typeof inp.hidro === "string") setHidro(inp.hidro);
-    if (typeof inp.L === "number") setL(inp.L);
-    if (typeof inp.A === "number") setA(inp.A);
-    if (typeof inp.H === "number") setH(inp.H); // ya guardamos H en cm
-    if (typeof inp.waste === "number") setWaste(inp.waste);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (async () => {
+      const part = await getPartida(projectId, partidaId);
+      if (!part?.inputs) return;
+      const inp = part.inputs as Partial<SavedInputs>;
+      if (typeof inp.tipo === "string") setTipo(inp.tipo);
+      if (typeof inp.hidro === "string") setHidro(inp.hidro);
+      if (typeof inp.L === "number") setL(inp.L);
+      if (typeof inp.A === "number") setA(inp.A);
+      if (typeof inp.H === "number") setH(inp.H); // ya guardamos H en cm
+      if (typeof inp.waste === "number") setWaste(inp.waste);
+    })();
   }, [projectId, partidaId]);
 
   useEffect(() => {
@@ -132,110 +146,124 @@ function CarpetaCalculator() {
   }, [hidros]);
 
   // Entrada para cálculo y función desacoplada
-  const input = { tipo, hidro, L, A, Hcm: H, wastePct: waste, mixMap, morteros };
-  // @ts-ignore – usa tu función real si existe; si no, devuelve el input
-  const calc = (C.calcCarpeta ?? C.default ?? ((x: any) => x)) as (arg: any) => any;
-  const r = calc(input);
+  const input = useMemo(
+    () => ({ tipo, hidro, L, A, Hcm: H, wastePct: waste, mixMap, morteros }),
+    [tipo, hidro, L, A, H, waste, mixMap, morteros]
+  );
+
+  type CalcInput = typeof input;
+  type CalcFn = (arg: CalcInput) => CarpetaResult;
+  const r: CarpetaResult = useMemo(() => {
+    const mod = C as unknown as { calcCarpeta?: CalcFn; default?: CalcFn };
+    const fn: CalcFn | undefined =
+      typeof mod.calcCarpeta === "function"
+        ? mod.calcCarpeta
+        : typeof mod.default === "function"
+          ? mod.default
+          : undefined;
+    return fn ? fn(input) : {};
+  }, [input]);
 
   // ---- Filas para la tabla (sin 'key', qty:number)
-  const rows: ResultRow[] = [];
-  if (typeof r?.area_m2 === "number")
-    rows.push({ label: "Área", qty: Math.round(r.area_m2 * 100) / 100, unit: "m²" });
-  if (typeof r?.espesor_cm === "number")
-    rows.push({ label: "Espesor", qty: Math.round(r.espesor_cm * 100) / 100, unit: "cm" });
+  const rows: ResultRow[] = useMemo(() => {
+    const out: ResultRow[] = [];
+    if (typeof r.area_m2 === "number")
+      out.push({ label: "Área", qty: Math.round(r.area_m2 * 100) / 100, unit: "m²" });
+    if (typeof r.espesor_cm === "number")
+      out.push({ label: "Espesor", qty: Math.round(r.espesor_cm * 100) / 100, unit: "cm" });
 
-  const vol = typeof r?.volumen_con_desperdicio_m3 === "number"
-    ? r.volumen_con_desperdicio_m3
-    : (typeof r?.volumen_m3 === "number" ? r.volumen_m3 : 0);
+    const vol = typeof r.volumen_con_desperdicio_m3 === "number"
+      ? r.volumen_con_desperdicio_m3
+      : (typeof r.volumen_m3 === "number" ? r.volumen_m3 : 0);
 
-  if (vol > 0)
-    rows.push({ label: "Volumen", qty: Math.round(vol * 100) / 100, unit: "m³" });
-
-  // --- materiales base que ya vinieran en r.materiales
-  const mat: Record<string, number> = {};
-  if (r?.materiales && typeof r.materiales === "object") {
-    for (const [k, v] of Object.entries(r.materiales)) {
-      mat[k] = Number(v) || 0;
-    }
-  }
-
-  // --- identificar mortero y desglosar por m³
-  const mortarIdFromRes = (r as any)?.mortero_id;
-  let mortarId =
-    mortarIdFromRes ??
-    ((typeof mixMap === "object" && mixMap)
-      ? (typeof (mixMap as any)[tipo] === "string"
-          ? (mixMap as any)[tipo]
-          : (typeof (mixMap as any)[tipo] === "object"
-              ? ((mixMap as any)[tipo][hidro] ?? (Object.values((mixMap as any)[tipo] || {})[0] as any))
-              : undefined))
-      : undefined);
-
-  // obtener mortero desde morteros (sea array o mapa)
-  const mortar: any = mortarId
-    ? (Array.isArray(morteros) ? morteros.find((m: any) => m.id === mortarId) : (morteros as any)[mortarId])
-    : undefined;
-
-  // sumar cemento/cal/arena/agua a 'mat'
-  if (vol > 0 && mortar) {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    if (typeof mortar.bolsas_cemento_por_m3 === "number")
-      mat.cemento_bolsas = round2((mat.cemento_bolsas || 0) + vol * mortar.bolsas_cemento_por_m3);
-    if (typeof mortar.kg_cal_por_m3 === "number")
-      mat.cal_kg = round2((mat.cal_kg || 0) + vol * mortar.kg_cal_por_m3);
-    if (typeof mortar.agua_l_por_m3 === "number")
-      mat.agua_l = round2((mat.agua_l || 0) + vol * mortar.agua_l_por_m3);
-
-    if (typeof mortar.arena_m3_por_m3 === "number") {
-      mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * mortar.arena_m3_por_m3);
-    } else {
-      const p = mortar.proporcion || {};
-      const total = (p.cemento ?? 0) + (p.cal ?? 0) + (p.arena ?? 0);
-      if (total > 0) {
-        const arenaFrac = (p.arena ?? 0) / total;
-        mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * arenaFrac);
-      }
-    }
-  }
-
-  // volcar 'mat' a filas
-  for (const [k, v] of Object.entries(mat)) {
-    const qty = Math.round((Number(v) || 0) * 100) / 100;
-    rows.push({ label: keyToLabel(k), qty, unit: keyToUnit(k) });
-  }
-
-  if ((r as any)?.mortero_id)
-    rows.push({ label: "Mortero (ID)", qty: 1, unit: keyToUnit("mortero_id") ?? "" });
-
-  // ---- Materiales para Proyecto (MaterialRow[])
-  const itemsForProject = useMemo<MaterialRow[]>(() => {
-    const list: MaterialRow[] = [];
+    if (vol > 0)
+      out.push({ label: "Volumen", qty: Math.round(vol * 100) / 100, unit: "m³" });
 
     const mat: Record<string, number> = {};
-    if (r?.materiales && typeof r.materiales === "object") {
+    if (r.materiales && typeof r.materiales === "object") {
       for (const [k, v] of Object.entries(r.materiales)) {
         mat[k] = Number(v) || 0;
       }
     }
 
-    const vol = typeof r?.volumen_con_desperdicio_m3 === "number"
+    // identificar mortero y desglosar por m³
+    const mortarIdFromRes = r.mortero_id;
+    const mm = mixMap as MixMap;
+    const mortarId = mortarIdFromRes ?? (() => {
+      const m = mm[tipo];
+      if (!m) return undefined;
+      return typeof m === "string" ? m : m[hidro] ?? Object.values(m)[0];
+    })();
+
+    const mortDB = morteros as Morteros;
+    const mortar: MortarDef | undefined = (() => {
+      if (!mortarId) return undefined;
+      return Array.isArray(mortDB)
+        ? mortDB.find((m) => m.id === mortarId)
+        : mortDB[mortarId];
+    })();
+
+    if (vol > 0 && mortar) {
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      if (typeof mortar.bolsas_cemento_por_m3 === "number")
+        mat.cemento_bolsas = round2((mat.cemento_bolsas || 0) + vol * mortar.bolsas_cemento_por_m3);
+      if (typeof mortar.kg_cal_por_m3 === "number")
+        mat.cal_kg = round2((mat.cal_kg || 0) + vol * mortar.kg_cal_por_m3);
+      if (typeof mortar.agua_l_por_m3 === "number")
+        mat.agua_l = round2((mat.agua_l || 0) + vol * mortar.agua_l_por_m3);
+
+      if (typeof mortar.arena_m3_por_m3 === "number") {
+        mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * mortar.arena_m3_por_m3);
+      } else {
+        const p = mortar.proporcion || {};
+        const total = (p.cemento ?? 0) + (p.cal ?? 0) + (p.arena ?? 0);
+        if (total > 0) {
+          const arenaFrac = (p.arena ?? 0) / total;
+          mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * arenaFrac);
+        }
+      }
+    }
+
+    for (const [k, v] of Object.entries(mat)) {
+      const qty = Math.round((Number(v) || 0) * 100) / 100;
+      out.push({ label: keyToLabel(k), qty, unit: keyToUnit(k) });
+    }
+
+    if (r.mortero_id)
+      out.push({ label: "Mortero (ID)", qty: 1, unit: keyToUnit("mortero_id") ?? "" });
+
+    return out;
+  }, [r, mixMap, morteros, tipo, hidro]);
+
+  // ---- Materiales para Proyecto (MaterialRow[])
+  const itemsForProject = useMemo<MaterialRow[]>(() => {
+    const list: MaterialRow[] = [];
+    const mat: Record<string, number> = {};
+    if (r.materiales && typeof r.materiales === "object") {
+      for (const [k, v] of Object.entries(r.materiales)) {
+        mat[k] = Number(v) || 0;
+      }
+    }
+
+    const vol = typeof r.volumen_con_desperdicio_m3 === "number"
       ? r.volumen_con_desperdicio_m3
-      : (typeof r?.volumen_m3 === "number" ? r.volumen_m3 : 0);
+      : (typeof r.volumen_m3 === "number" ? r.volumen_m3 : 0);
 
-    const mortarIdFromRes = (r as any)?.mortero_id;
-    let mortarId =
-      mortarIdFromRes ??
-      ((typeof mixMap === "object" && mixMap)
-        ? (typeof (mixMap as any)[tipo] === "string"
-            ? (mixMap as any)[tipo]
-            : (typeof (mixMap as any)[tipo] === "object"
-                ? ((mixMap as any)[tipo][hidro] ?? (Object.values((mixMap as any)[tipo] || {})[0] as any))
-                : undefined))
-        : undefined);
+    const mortarIdFromRes = r.mortero_id;
+    const mm = mixMap as MixMap;
+    const mortarId = mortarIdFromRes ?? (() => {
+      const m = mm[tipo];
+      if (!m) return undefined;
+      return typeof m === "string" ? m : m[hidro] ?? Object.values(m)[0];
+    })();
 
-    const mortar: any = mortarId
-      ? (Array.isArray(morteros) ? morteros.find((m: any) => m.id === mortarId) : (morteros as any)[mortarId])
-      : undefined;
+    const mortDB = morteros as Morteros;
+    const mortar: MortarDef | undefined = (() => {
+      if (!mortarId) return undefined;
+      return Array.isArray(mortDB)
+        ? mortDB.find((m) => m.id === mortarId)
+        : mortDB[mortarId];
+    })();
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -263,12 +291,12 @@ function CarpetaCalculator() {
       list.push({
         key: k,
         label: keyToLabel(k),
-        qty: round2(Number(v) || 0),
-        unit: normalizeUnit(keyToUnit(k)),
+        qty: Math.round((Number(v) || 0) * 100) / 100,
+        unit: toUnit(keyToUnit(k)),
       });
     }
     return list;
-  }, [r?.materiales, r?.volumen_con_desperdicio_m3, r?.volumen_m3, r?.mortero_id, mixMap, tipo, hidro, morteros]);
+  }, [r, mixMap, morteros, tipo, hidro]);
 
   // Título de partida por defecto
   const defaultTitle = useMemo(
@@ -281,66 +309,17 @@ function CarpetaCalculator() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const currentInput = { tipo, hidro, L, A, Hcm: H, wastePct: waste, mixMap, morteros };
-    const res = calc(currentInput);
-
-    // === mismos materiales que en itemsForProject ===
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    const mat: Record<string, number> = {};
-    if (res?.materiales && typeof res.materiales === "object") {
-      for (const [k, v] of Object.entries(res.materiales)) mat[k] = Number(v) || 0;
-    }
-    const vol =
-      typeof res?.volumen_con_desperdicio_m3 === "number" ? res.volumen_con_desperdicio_m3 :
-      (typeof res?.volumen_m3 === "number" ? res.volumen_m3 : 0);
-
-    const mortarIdFromRes = (res as any)?.mortero_id;
-    const mortarId =
-      mortarIdFromRes ??
-      (typeof mixMap === "object" && mixMap
-        ? (typeof (mixMap as any)[tipo] === "string"
-            ? (mixMap as any)[tipo]
-            : (typeof (mixMap as any)[tipo] === "object"
-                ? ((mixMap as any)[tipo][hidro] ?? (Object.values((mixMap as any)[tipo] || {})[0] as any))
-                : undefined))
-        : undefined);
-    const mortar: any = mortarId
-      ? (Array.isArray(morteros) ? morteros.find((m: any) => m.id === mortarId) : (morteros as any)[mortarId])
-      : undefined;
-
-    if (vol > 0 && mortar) {
-      if (typeof mortar.bolsas_cemento_por_m3 === "number")
-        mat.cemento_bolsas = round2((mat.cemento_bolsas || 0) + vol * mortar.bolsas_cemento_por_m3);
-      if (typeof mortar.kg_cal_por_m3 === "number")
-        mat.cal_kg = round2((mat.cal_kg || 0) + vol * mortar.kg_cal_por_m3);
-      if (typeof mortar.agua_l_por_m3 === "number")
-        mat.agua_l = round2((mat.agua_l || 0) + vol * mortar.agua_l_por_m3);
-
-      if (typeof mortar.arena_m3_por_m3 === "number") {
-        mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * mortar.arena_m3_por_m3);
-      } else {
-        const p = mortar.proporcion || {};
-        const total = (p.cemento ?? 0) + (p.cal ?? 0) + (p.arena ?? 0);
-        if (total > 0) {
-          const arenaFrac = (p.arena ?? 0) / total;
-          mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * arenaFrac);
-        }
-      }
-    }
-
-    const materials: MaterialRow[] = Object.entries(mat).map(([k, v]) => ({
-      key: k,
-      label: keyToLabel(k),
-      qty: round2(Number(v) || 0),
-      unit: normalizeUnit(keyToUnit(k)),
+    const materials: MaterialRow[] = itemsForProject.map((m) => ({
+      ...m,
+      unit: toUnit(m.unit),
     }));
-
+    const outputs = r as unknown as Record<string, unknown>;
     const item: BatchItem = {
       kind: "carpeta",
       title: defaultTitle,
       materials,
       inputs: { tipo, hidro, L, A, H, waste },
-      outputs: res,
+      outputs,
     };
 
     setBatch((prev) => {
@@ -372,66 +351,20 @@ function CarpetaCalculator() {
   };
 
   // --------- Actualizar partida (deep-link) -----------
-  const handleUpdatePartida = () => {
+  const handleUpdatePartida = async () => {
     if (!projectId || !partidaId) return;
-    const res = calc({ tipo, hidro, L, A, Hcm: H, wastePct: waste, mixMap, morteros });
-
-    // construir materiales igual que itemsForProject
-    const mat: Record<string, number> = {};
-    if (res?.materiales && typeof res.materiales === "object") {
-      for (const [k, v] of Object.entries(res.materiales)) mat[k] = Number(v) || 0;
-    }
-    const vol =
-      typeof res?.volumen_con_desperdicio_m3 === "number" ? res.volumen_con_desperdicio_m3 :
-      (typeof res?.volumen_m3 === "number" ? res.volumen_m3 : 0);
-
-    const mortarIdFromRes = (res as any)?.mortero_id;
-    const mortarId =
-      mortarIdFromRes ??
-      (typeof mixMap === "object" && mixMap
-        ? (typeof (mixMap as any)[tipo] === "string"
-            ? (mixMap as any)[tipo]
-            : (typeof (mixMap as any)[tipo] === "object"
-                ? ((mixMap as any)[tipo][hidro] ?? (Object.values((mixMap as any)[tipo] || {})[0] as any))
-                : undefined))
-        : undefined);
-    const mortar: any = mortarId
-      ? (Array.isArray(morteros) ? morteros.find((m: any) => m.id === mortarId) : (morteros as any)[mortarId])
-      : undefined;
-
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    if (vol > 0 && mortar) {
-      if (typeof mortar.bolsas_cemento_por_m3 === "number")
-        mat.cemento_bolsas = round2((mat.cemento_bolsas || 0) + vol * mortar.bolsas_cemento_por_m3);
-      if (typeof mortar.kg_cal_por_m3 === "number")
-        mat.cal_kg = round2((mat.cal_kg || 0) + vol * mortar.kg_cal_por_m3);
-      if (typeof mortar.agua_l_por_m3 === "number")
-        mat.agua_l = round2((mat.agua_l || 0) + vol * mortar.agua_l_por_m3);
-      if (typeof mortar.arena_m3_por_m3 === "number") {
-        mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * mortar.arena_m3_por_m3);
-      } else {
-        const p = mortar.proporcion || {};
-        const total = (p.cemento ?? 0) + (p.cal ?? 0) + (p.arena ?? 0);
-        if (total > 0) {
-          const arenaFrac = (p.arena ?? 0) / total;
-          mat.arena_m3 = round2((mat.arena_m3 || 0) + vol * arenaFrac);
-        }
-      }
-    }
-
-    const materials: MaterialRow[] = Object.entries(mat).map(([k, v]) => ({
-      key: k,
-      label: keyToLabel(k),
-      qty: round2(Number(v) || 0),
-      unit: normalizeUnit(keyToUnit(k)),
+    const materials: MaterialRow[] = itemsForProject.map((m) => ({
+      ...m,
+      unit: toUnit(m.unit),
     }));
-
-    updatePartida(projectId, partidaId, {
+    const outputs = r as unknown as Record<string, unknown>;
+    await updatePartida(projectId, partidaId, {
       title: defaultTitle,
       inputs: { tipo, hidro, L, A, H, waste },
-      outputs: res,
+      outputs,
       materials,
     });
+    alert("Partida actualizada.");
   };
 
   if (!options) return null;
@@ -541,19 +474,21 @@ function CarpetaCalculator() {
           <h2 className="font-medium mb-2">Resultado</h2>
           <ResultTable title="Resultado" items={rows} />
           {(() => {
-            const mortarIdFromRes = (r as any)?.mortero_id;
+            const mm = mixMap as MixMap;
             const mortarId =
-              mortarIdFromRes ??
-              ((typeof mixMap === "object" && mixMap)
-                ? (typeof (mixMap as any)[tipo] === "string"
-                    ? (mixMap as any)[tipo]
-                    : (typeof (mixMap as any)[tipo] === "object"
-                        ? ((mixMap as any)[tipo][hidro] ?? (Object.values((mixMap as any)[tipo] || {})[0] as any))
-                        : undefined))
-                : undefined);
-            const mortar: any = mortarId
-              ? (Array.isArray(morteros) ? morteros.find((m: any) => m.id === mortarId) : (morteros as any)[mortarId])
-              : undefined;
+              r.mortero_id ??
+              (() => {
+                const m = mm[tipo];
+                if (!m) return undefined;
+                return typeof m === "string" ? m : m[hidro] ?? Object.values(m)[0];
+              })();
+            const mortDB = morteros as Morteros;
+            const mortar: MortarDef | undefined = (() => {
+              if (!mortarId) return undefined;
+              return Array.isArray(mortDB)
+                ? mortDB.find((m) => m.id === mortarId)
+                : mortDB[mortarId];
+            })();
 
             const p = mortar?.proporcion;
             const agua = mortar?.agua_l_por_m3;
@@ -598,7 +533,7 @@ function CarpetaCalculator() {
           kind="carpeta"
           defaultTitle={defaultTitle}
           items={itemsForProject}
-          raw={r}
+          raw={r as Record<string, unknown>}
         />
       )}
 
@@ -619,8 +554,7 @@ function CarpetaCalculator() {
   );
 }
 
-// Este es el componente de página que se exporta por defecto.
-// Envuelve el calculador en <Suspense> para evitar el error de build.
+// Página con Suspense para que useSearchParams no rompa en build
 export default function CarpetaPage() {
   return (
     <Suspense fallback={<div>Cargando calculadora...</div>}>

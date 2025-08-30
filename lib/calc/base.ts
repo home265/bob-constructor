@@ -48,6 +48,7 @@ export type BaseInput = {
 };
 
 export type BaseResult = {
+  meshDoubleLayer: boolean; // <- requerido siempre
   area_m2: number;
   espesor_cm: number;
   volumen_m3: number;
@@ -101,6 +102,7 @@ export function calcBase(input: BaseInput): BaseResult {
     const mallaKg = kg_m2 * area * capas * fWaste;
 
     return {
+      meshDoubleLayer, // <-- agregado
       area_m2: round2(area),
       espesor_cm: round2(Hcm),
       volumen_m3: round2(vol),
@@ -112,7 +114,7 @@ export function calcBase(input: BaseInput): BaseResult {
     };
   }
 
-  // ---- Modo barras
+  // ---- Modo barras (o simple si no hay suficiente data)
   const cover_m = Math.max(0, safeN(cover_cm)) / 100;
   const libre_L = Math.max(0, safeN(L) - 2 * cover_m);
   const libre_B = Math.max(0, safeN(B) - 2 * cover_m);
@@ -168,18 +170,21 @@ export function calcBase(input: BaseInput): BaseResult {
   const modo: BaseResult["modo"] = detX || detY ? "barras" : "simple";
 
   return {
+    meshDoubleLayer: false, // <-- agregado (en barras/simple no aplica malla)
     area_m2: round2(area),
     espesor_cm: round2(Hcm),
     volumen_m3: round2(vol),
     volumen_con_desperdicio_m3: round2(volW),
     modo,
     concreteClassId,
-    barras: {
-      acero_kg: round2(kgTot),
-      x: detX,
-      y: detY,
-      capas,
-    },
+    barras: (detX || detY)
+      ? {
+          acero_kg: round2(kgTot),
+          x: detX,
+          y: detY,
+          capas,
+        }
+      : undefined,
   };
 }
 

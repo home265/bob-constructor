@@ -30,6 +30,18 @@ type ConcreteRow = {
 };
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
 
+// Inputs guardados en la partida (para tipado fuerte)
+type ColumnaInputs = {
+  H_m: number;
+  b_cm: number;
+  h_cm: number;
+  cover_cm: number;
+  concreteClassId: string;
+  wastePct: number;
+  vertical?: { phi_mm: number; n: number };
+  stirrups?: { phi_mm: number; spacing_cm: number; hook_cm: number };
+};
+
 // — helper Unit para evitar errores de tipos —
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
@@ -98,29 +110,33 @@ function ColumnaCalculator() {
   const [s, setS] = useState(20);       // cm
   const [hook, setHook] = useState(10); // cm
 
-  // (C) Precarga si venimos por deep-link
+  // (C) Precarga si venimos por deep-link —> ahora asíncrona
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = p?.inputs as any;
-    if (!inp) return;
-    if (typeof inp.H_m === "number") setH(inp.H_m);
-    if (typeof inp.b_cm === "number") setB(inp.b_cm);
-    if (typeof inp.h_cm === "number") setHsec(inp.h_cm);
-    if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
-    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
-    if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
 
-    if (inp.vertical) {
-      setPhiV(inp.vertical.phi_mm ?? phiV);
-      setNV(inp.vertical.n ?? nV);
-    }
-    if (inp.stirrups) {
-      setPhiS(inp.stirrups.phi_mm ?? phiS);
-      setS(inp.stirrups.spacing_cm ?? s);
-      setHook(inp.stirrups.hook_cm ?? hook);
-    }
-  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      const inp = (p?.inputs ?? undefined) as Partial<ColumnaInputs> | undefined;
+      if (!inp) return;
+
+      if (typeof inp.H_m === "number") setH(inp.H_m);
+      if (typeof inp.b_cm === "number") setB(inp.b_cm);
+      if (typeof inp.h_cm === "number") setHsec(inp.h_cm);
+      if (typeof inp.cover_cm === "number") setCover(inp.cover_cm);
+      if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+      if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
+
+      if (inp.vertical) {
+        if (typeof inp.vertical.phi_mm === "number") setPhiV(inp.vertical.phi_mm);
+        if (typeof inp.vertical.n === "number") setNV(inp.vertical.n);
+      }
+      if (inp.stirrups) {
+        if (typeof inp.stirrups.phi_mm === "number") setPhiS(inp.stirrups.phi_mm);
+        if (typeof inp.stirrups.spacing_cm === "number") setS(inp.stirrups.spacing_cm);
+        if (typeof inp.stirrups.hook_cm === "number") setHook(inp.stirrups.hook_cm);
+      }
+    })();
+  }, [projectId, partidaId]);
 
   // Map rebar table
   const rebarMap = useMemo(() => {
@@ -129,8 +145,12 @@ function ColumnaCalculator() {
     return m;
   }, [rebarOpts]);
 
-  // Cálculo
-  const res = C.calcColumna({
+  // Cálculo (con fallback por si exportás default en la lib)
+  const calc =
+    (C as any).calcColumna ??
+    (C as any).default ??
+    ((x: any) => x);
+  const res = calc({
     H_m: H,
     b_cm: b,
     h_cm: h,
@@ -245,14 +265,14 @@ function ColumnaCalculator() {
     kind: "columna";
     title: string;
     materials: MaterialRow[];
-    inputs: any;
+    inputs: ColumnaInputs;
     outputs: Record<string, any>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const inputs = {
+    const inputs: ColumnaInputs = {
       H_m: H,
       b_cm: b,
       h_cm: h,
@@ -283,7 +303,7 @@ function ColumnaCalculator() {
   const handleEditFromBatch = (index: number) => {
     const it = batch[index];
     if (!it) return;
-    const inp = it.inputs || {};
+    const inp = it.inputs || ({} as Partial<ColumnaInputs>);
     setH(inp.H_m ?? H);
     setB(inp.b_cm ?? b);
     setHsec(inp.h_cm ?? h);
@@ -321,7 +341,7 @@ function ColumnaCalculator() {
         wastePct: waste,
         vertical: { phi_mm: phiV, n: nV },
         stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
-      },
+      } satisfies ColumnaInputs,
       outputs: res as any,
       materials: itemsForProject,
     });
@@ -530,7 +550,7 @@ function ColumnaCalculator() {
                 className="rounded border px-3 py-2 ml-2"
                 onClick={() => setEditIndex(null)}
               >
-                Cancelar edición
+              Cancelar edición
               </button>
             )}
           </div>

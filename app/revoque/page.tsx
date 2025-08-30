@@ -112,7 +112,8 @@ function RevoqueCalculator() {
     if (ladosOpts.length && !ladosOpts.find((l) => l.key === lado)) {
       setLado(ladosOpts[0].key as LadoKey);
     }
-  }, [ladosOpts]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ladosOpts]);
 
   useEffect(() => {
     if (terminaciones.length && !terminaciones.find((t) => t.key === term1)) {
@@ -126,21 +127,24 @@ function RevoqueCalculator() {
     ) {
       setTerm2(terminaciones[0].key);
     }
-  }, [terminaciones, lado]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terminaciones, lado]);
 
-  // (C) precargar desde partida si viene deep-link
+  // (C) precargar desde partida si viene deep-link (async)
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    if (!p?.inputs) return;
-    const inp = p.inputs as any;
-    if (inp.lados) setLado(inp.lados);
-    if (inp.term1) setTerm1(inp.term1);
-    if (inp.term2) setTerm2(inp.term2);
-    if (typeof inp.L === "number") setL(inp.L);
-    if (typeof inp.H === "number") setH(inp.H);
-    if (typeof inp.e_cm === "number") setE(inp.e_cm);
-    if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      if (!p?.inputs) return;
+      const inp = p.inputs as any;
+      if (inp.lados) setLado(inp.lados);
+      if (inp.term1) setTerm1(inp.term1);
+      if (inp.term2) setTerm2(inp.term2);
+      if (typeof inp.L === "number") setL(inp.L);
+      if (typeof inp.H === "number") setH(inp.H);
+      if (typeof inp.e_cm === "number") setE(inp.e_cm);
+      if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
+    })();
   }, [projectId, partidaId]);
 
   // Cálculo
@@ -173,7 +177,6 @@ function RevoqueCalculator() {
   }
 
   // Identificar mortero a partir del propio resultado o de la terminación
-  // Si el cálculo dio un único mortero_id, lo uso; si hay 2 terminaciones distintas no desgloso (evito estimar mal).
   const resMortarId = (res as any)?.mortero_id as string | undefined;
 
   let mortarIdToUse: string | undefined;
@@ -240,17 +243,15 @@ function RevoqueCalculator() {
       out.push({ label: keyToLabel(k), qty, unit: keyToUnit(k) });
     }
 
-    // terminaciones (texto)
-    if (Array.isArray(res?.terminaciones) && res.terminaciones.length) {
-      out.push({ label: "Terminaciones", qty: res.terminaciones.join(" + ") });
-    } else {
-      const t1 = TERM_LABELS[term1] ?? term1;
-      const t2 = TERM_LABELS[term2] ?? term2;
-      out.push({
-        label: "Terminaciones",
-        qty: lado === "ambos" ? `${t1} + ${t2}` : t1,
-      });
-    }
+    // terminaciones (texto como nota simple)
+    const t1 = TERM_LABELS[term1] ?? term1;
+    const t2 = TERM_LABELS[term2] ?? term2;
+    out.push({
+      label: "Terminaciones",
+      qty: lado === "ambos" ? (t1 === t2 ? 2 : 1) : 1,
+      unit: lado === "ambos" ? (t1 === t2 ? `(${t1} ambos lados)` : `(${t1} + ${t2})`) : `(${t1})`,
+    });
+
     return out;
   })();
 
@@ -267,18 +268,17 @@ function RevoqueCalculator() {
       });
     }
 
-    // agregar desglose si existe
     for (const [k, v] of Object.entries(matAcum)) {
       list.push({
         key: k,
         label: keyToLabel(k),
         qty: Math.round((Number(v) || 0) * 100) / 100,
-        unit: normalizeUnit(keyToUnit(k) as any),
+        unit: normalizeUnit(keyToUnit(k) as string),
       });
     }
 
     return list;
-  }, [mortVol, JSON.stringify(matAcum)]);
+  }, [mortVol, matAcum]);
 
   const defaultTitle =
     `Revoque ${L}×${H} m` + (lado === "ambos" ? " (ambos lados)" : " (un lado)");
@@ -349,9 +349,9 @@ function RevoqueCalculator() {
   };
 
   // (C) Actualizar partida (si venimos por deep-link)
-  const handleUpdatePartida = () => {
+  const handleUpdatePartida = async () => {
     if (!projectId || !partidaId) return;
-    updatePartida(projectId, partidaId, {
+    await updatePartida(projectId, partidaId, {
       title: defaultTitle,
       inputs: {
         lados: lado,

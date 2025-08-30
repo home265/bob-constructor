@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "canvg": "^4.0.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "dexie": "^3.2.4",
     "exceljs": "^4.4.0",
     "firebase": "^10.12.4",
+    "jspdf": "^2.5.1",
     "lucide-react": "latest",
     "next": "15.5.0",
     "pdf-lib": "^1.17.1",

@@ -14,26 +14,58 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 
-// helpers de etiquetas/unidades ya usados en otras páginas
+// helpers
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
+
+/* ----------------------------- Tipos auxiliares ---------------------------- */
 
 type ConcreteRow = {
   id?: string;
   label?: string;
-  // coeficientes posibles por m³ (flexibles según tu JSON)
   bolsas_cemento_por_m3?: number;
   cemento_bolsas_por_m3?: number;
   cemento_kg_por_m3?: number;
   arena_m3_por_m3?: number;
   grava_m3_por_m3?: number;
-  piedra_m3_por_m3?: number; // alias de grava
+  piedra_m3_por_m3?: number;
   agua_l_por_m3?: number;
 };
 
 type RebarRow = { id?: string; phi_mm?: number; kg_m?: number; label?: string };
-type MeshRow = { id?: string; label?: string; kg_m2?: number };
+type MeshRow  = { id?: string; label?: string; kg_m2?: number };
 
-// ------- helper Unit (evita errores de tipos) -------
+type BarsInput = {
+  phi_x_mm: number;
+  spacing_x_cm: number;
+  phi_y_mm: number;
+  spacing_y_cm: number;
+  doubleLayer: boolean;
+};
+
+type BaseInputs = {
+  L: number;
+  B: number;
+  Hcm: number;
+  concreteClassId: string;
+  wastePct: number;
+  cover_cm: number;
+  mallaId: string;          // "" si no se usa malla
+  meshDoubleLayer: boolean;
+  bars?: BarsInput;         // undefined si se usa malla
+};
+
+type BaseOutputs = Record<string, unknown>;
+
+type BatchItem = {
+  kind: "base";
+  title: string;
+  materials: MaterialRow[];
+  inputs: BaseInputs;
+  outputs: BaseOutputs;
+};
+
+/* ----------------------------- Helpers de unidad --------------------------- */
+
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
   if (s === "m²" || s === "m2") return "m2";
@@ -41,17 +73,17 @@ function normalizeUnit(u: string): Unit {
   if (s === "kg") return "kg";
   if (s === "l" || s === "lt" || s === "litros") return "l";
   if (s === "m" || s === "metros") return "m";
-  // bolsas / unidades a "u"
   return "u";
 }
 
-// Componente principal que contiene toda la lógica del cliente
+/* -------------------------------- Componente ------------------------------- */
+
 function BaseCalculator() {
   const sp = useSearchParams();
-  const projectId = sp.get("projectId");
-  const partidaId = sp.get("partidaId");
+  const projectId  = sp.get("projectId");
+  const partidaId  = sp.get("partidaId");
 
-  // Opciones/coeficientes desde JSON (con fallbacks seguros)
+  // JSONs con fallbacks seguros
   const concrete = useJson<Record<string, ConcreteRow>>("/data/concrete_classes.json", {
     H17: { id: "H17", label: "H-17" },
     H21: { id: "H21", label: "H-21" },
@@ -59,23 +91,22 @@ function BaseCalculator() {
   });
 
   const rebars = useJson<Record<string, RebarRow>>("/data/rebar_diams.json", {
-    "8": { id: "8", phi_mm: 8, kg_m: 0.395, label: "Φ8 (0.395 kg/m)" },
+    "8":  { id: "8",  phi_mm: 8,  kg_m: 0.395, label: "Φ8 (0.395 kg/m)" },
     "10": { id: "10", phi_mm: 10, kg_m: 0.617, label: "Φ10 (0.617 kg/m)" },
     "12": { id: "12", phi_mm: 12, kg_m: 0.888, label: "Φ12 (0.888 kg/m)" },
   });
 
   const meshes = useJson<Record<string, MeshRow>>("/data/mesh_sima.json", {
-    Q131: { id: "Q131", label: "Q131 (≈2.0 kg/m²)", kg_m2: 2.0 },
+    Q131: { id: "Q131", label: "Q131 (≈2.0 kg/m²)",  kg_m2: 2.0 },
     Q188: { id: "Q188", label: "Q188 (≈2.93 kg/m²)", kg_m2: 2.93 },
   });
 
-  // Normalizo para selects
+  // Opciones para selects
   const concreteOpts = useMemo(
-    () =>
-      Object.values(concrete ?? {}).map((r, i) => ({
-        key: r?.id ?? `c${i}`,
-        label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
-      })),
+    () => Object.values(concrete ?? {}).map((r, i) => ({
+      key: r?.id ?? `c${i}`,
+      label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
+    })),
     [concrete]
   );
 
@@ -91,40 +122,41 @@ function BaseCalculator() {
   }, [rebars]);
 
   const meshOpts = useMemo(
-    () =>
-      Object.values(meshes ?? {}).map((r, i) => ({
-        key: r?.id ?? `m${i}`,
-        label: r?.label ?? r?.id ?? `Malla ${i + 1}`,
-        kg_m2: r?.kg_m2 ?? 0,
-      })),
+    () => Object.values(meshes ?? {}).map((r, i) => ({
+      key: r?.id ?? `m${i}`,
+      label: r?.label ?? r?.id ?? `Malla ${i + 1}`,
+      kg_m2: r?.kg_m2 ?? 0,
+    })),
     [meshes]
   );
 
-  // Estado del formulario
+  // Estado
   const [concreteId, setConcreteId] = useState<string>(concreteOpts[0]?.key ?? "H21");
-  const [L, setL] = useState(1.5); // m
-  const [B, setB] = useState(1.5); // m
-  const [Hcm, setHcm] = useState(30); // cm
-  const [cover, setCover] = useState(5); // cm
-  const [waste, setWaste] = useState(8); // %
+  const [L, setL]       = useState(1.5);
+  const [B, setB]       = useState(1.5);
+  const [Hcm, setHcm]   = useState(30);
+  const [cover, setCover] = useState(5);
+  const [waste, setWaste] = useState(8);
 
-  // Modo malla o barras
   const [useMesh, setUseMesh] = useState(false);
-  const [meshId, setMeshId] = useState<string>(meshOpts[0]?.key ?? "");
+  const [meshId, setMeshId]   = useState<string>(meshOpts[0]?.key ?? "");
   const [meshDoubleLayer, setMeshDoubleLayer] = useState(false);
 
   const [phiX, setPhiX] = useState<number>(rebarOpts[0]?.phi_mm ?? 10);
-  const [sX, setSX] = useState<number>(20); // cm
+  const [sX, setSX]     = useState<number>(20);
   const [phiY, setPhiY] = useState<number>(rebarOpts[1]?.phi_mm ?? 8);
-  const [sY, setSY] = useState<number>(20); // cm
+  const [sY, setSY]     = useState<number>(20);
   const [doubleLayer, setDoubleLayer] = useState(false);
 
-  // (C) Precarga si venimos por deep-link
+  // Precarga desde partida (deep-link)
   useEffect(() => {
-    if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    const inp = p?.inputs as any;
+  if (!projectId || !partidaId) return;
+
+  (async () => {
+    const p = await getPartida(projectId, partidaId); // <- await
+    const inp = (p?.inputs ?? undefined) as Partial<BaseInputs> | undefined;
     if (!inp) return;
+
     if (typeof inp.L === "number") setL(inp.L);
     if (typeof inp.B === "number") setB(inp.B);
     if (typeof inp.Hcm === "number") setHcm(inp.Hcm);
@@ -132,38 +164,38 @@ function BaseCalculator() {
     if (typeof inp.wastePct === "number") setWaste(inp.wastePct);
     if (typeof inp.concreteClassId === "string") setConcreteId(inp.concreteClassId);
 
-    if (inp.mallaId != null && typeof inp.mallaId === "string" && inp.mallaId !== "") {
+    if (typeof inp.mallaId === "string" && inp.mallaId !== "") {
       setUseMesh(true);
       setMeshId(inp.mallaId);
       setMeshDoubleLayer(!!inp.meshDoubleLayer);
     } else if (inp.bars) {
       setUseMesh(false);
-      setPhiX(inp.bars.phi_x_mm ?? phiX);
-      setSX(inp.bars.spacing_x_cm ?? sX);
-      setPhiY(inp.bars.phi_y_mm ?? phiY);
-      setSY(inp.bars.spacing_y_cm ?? sY);
+      setPhiX(inp.bars.phi_x_mm);
+      setSX(inp.bars.spacing_x_cm);
+      setPhiY(inp.bars.phi_y_mm);
+      setSY(inp.bars.spacing_y_cm);
       setDoubleLayer(!!inp.bars.doubleLayer);
     }
-  }, [projectId, partidaId]); // eslint-disable-line react-hooks/exhaustive-deps
+  })();
+}, [projectId, partidaId]);
 
-  // Mapas para pasar a la lib
+
+  // Tablas para la lib
   const rebarMap = useMemo(() => {
     const m: Record<string, { kg_m?: number; label?: string }> = {};
-    rebarOpts.forEach((r) => (m[String(r.phi_mm)] = { kg_m: r.kg_m, label: r.label }));
+    rebarOpts.forEach((r) => { m[String(r.phi_mm)] = { kg_m: r.kg_m, label: r.label }; });
     return m;
   }, [rebarOpts]);
 
   const meshMap = useMemo(() => {
     const m: Record<string, { kg_m2?: number; label?: string }> = {};
-    meshOpts.forEach((r) => (m[r.key] = { kg_m2: r.kg_m2, label: r.label }));
+    meshOpts.forEach((r) => { m[r.key] = { kg_m2: r.kg_m2, label: r.label }; });
     return m;
   }, [meshOpts]);
 
-  // Cálculo (usamos la lib)
-  const res = C.calcBase({
-    L,
-    B,
-    Hcm,
+  // Cálculo (memoizado)
+  const res = useMemo(() => C.calcBase({
+    L, B, Hcm,
     concreteClassId: concreteId,
     wastePct: waste,
     cover_cm: cover,
@@ -180,166 +212,130 @@ function BaseCalculator() {
           doubleLayer,
         },
     rebarTable: rebarMap,
-  });
+  }), [L, B, Hcm, concreteId, waste, cover, useMesh, meshId, meshMap, meshDoubleLayer, phiX, sX, phiY, sY, doubleLayer, rebarMap]);
 
-  // (B) Desglose de materiales del hormigón a partir de concrete_classes.json
-  const vol = (res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3) || 0;
+  /* ------------------------ Desglose de materiales ------------------------ */
+
+  const vol = useMemo(
+    () => (res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3) || 0,
+    [res?.volumen_con_desperdicio_m3, res?.volumen_m3]
+  );
+
   const concreteRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
 
-  const matBreakdown: Record<string, number> = {};
-  if (vol > 0 && concreteRow) {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
+  const matBreakdown = useMemo<Record<string, number>>(() => {
+    const out: Record<string, number> = {};
+    if (vol > 0 && concreteRow) {
+      const round2 = (n: number) => Math.round(n * 100) / 100;
 
-    const bolsas =
-      concreteRow.bolsas_cemento_por_m3 ??
-      concreteRow.cemento_bolsas_por_m3;
-    if (typeof bolsas === "number")
-      matBreakdown.cemento_bolsas = round2(vol * bolsas);
+      const bolsas = concreteRow.bolsas_cemento_por_m3 ?? concreteRow.cemento_bolsas_por_m3;
+      if (typeof bolsas === "number") out.cemento_bolsas = round2(vol * bolsas);
 
-    if (typeof concreteRow.cemento_kg_por_m3 === "number")
-      matBreakdown.cemento_kg = round2(vol * concreteRow.cemento_kg_por_m3);
+      if (typeof concreteRow.cemento_kg_por_m3 === "number")
+        out.cemento_kg = round2(vol * concreteRow.cemento_kg_por_m3);
 
-    const arena = concreteRow.arena_m3_por_m3;
-    if (typeof arena === "number")
-      matBreakdown.arena_m3 = round2(vol * arena);
+      if (typeof concreteRow.arena_m3_por_m3 === "number")
+        out.arena_m3 = round2(vol * concreteRow.arena_m3_por_m3);
 
-    const grava = concreteRow.grava_m3_por_m3 ?? concreteRow.piedra_m3_por_m3;
-    if (typeof grava === "number")
-      matBreakdown.piedra_m3 = round2(vol * grava); // mostramos como "Piedra" si tu keyToLabel lo mapea
+      const grava = concreteRow.grava_m3_por_m3 ?? concreteRow.piedra_m3_por_m3;
+      if (typeof grava === "number") out.piedra_m3 = round2(vol * grava);
 
-    if (typeof concreteRow.agua_l_por_m3 === "number")
-      matBreakdown.agua_l = round2(vol * concreteRow.agua_l_por_m3);
-  }
+      if (typeof concreteRow.agua_l_por_m3 === "number")
+        out.agua_l = round2(vol * concreteRow.agua_l_por_m3);
+    }
+    return out;
+  }, [vol, concreteRow]);
 
-  // Filas de salida (para la tabla)
-  const rows: ResultRow[] = [];
-  if (res?.area_m2 != null) rows.push({ label: "Área", qty: res.area_m2, unit: "m²" });
-  if (res?.espesor_cm != null) rows.push({ label: "Espesor", qty: res.espesor_cm, unit: "cm" });
-  if (vol > 0) rows.push({ label: "Hormigón", qty: Math.round(vol * 100) / 100, unit: "m³", hint: "Con desperdicio" });
+  /* ----------------------------- Tabla de salida -------------------------- */
 
-  // acero (malla o barras)
-  if (res?.modo === "malla" && res?.malla_kg != null) {
-    rows.push({
-      label: `Malla ${res?.malla_id ?? ""}`,
-      qty: res.malla_kg,
-      unit: "kg",
-      hint: meshDoubleLayer ? "2 capas" : "1 capa",
-    });
-  }
+  const rows: ResultRow[] = useMemo(() => {
+    const r: ResultRow[] = [];
+    if (res?.area_m2 != null)     r.push({ label: "Área",     qty: res.area_m2,   unit: "m²" });
+    if (res?.espesor_cm != null)  r.push({ label: "Espesor",  qty: res.espesor_cm, unit: "cm" });
+    if (vol > 0)                  r.push({ label: "Hormigón", qty: Math.round(vol * 100) / 100, unit: "m³", hint: "Con desperdicio" });
 
-  if (res?.modo === "barras" && res?.barras) {
-    const b = res.barras;
-    if (b.acero_kg != null)
-      rows.push({
-        label: "Acero total",
-        qty: b.acero_kg,
+    if (res?.modo === "malla" && res?.malla_kg != null) {
+      r.push({
+        label: `Malla ${res?.malla_id ?? ""}`,
+        qty: res.malla_kg,
         unit: "kg",
-        hint: b.capas === 2 ? "2 capas" : "1 capa",
+        hint: (res?.meshDoubleLayer || false) ? "2 capas" : "1 capa",
       });
-
-    if (b.x) {
-      const x = b.x;
-      rows.push({
-        label: `Barras X Φ${x.phi_mm}`,
-        qty: x.largo_total_m ?? 0,
-        unit: "m",
-        hint: `${x.n} uds · e=${x.spacing_cm} cm`,
-      });
-      if (x.kg != null) rows.push({ label: `Peso X Φ${x.phi_mm}`, qty: x.kg, unit: "kg" });
     }
-    if (b.y) {
-      const y = b.y;
-      rows.push({
-        label: `Barras Y Φ${y.phi_mm}`,
-        qty: y.largo_total_m ?? 0,
-        unit: "m",
-        hint: `${y.n} uds · e=${y.spacing_cm} cm`,
-      });
-      if (y.kg != null) rows.push({ label: `Peso Y Φ${y.phi_mm}`, qty: y.kg, unit: "kg" });
+
+    if (res?.modo === "barras" && res?.barras) {
+      const b = res.barras as {
+        acero_kg?: number;
+        capas?: number;
+        x?: { phi_mm: number; spacing_cm: number; largo_total_m?: number; n?: number; kg?: number };
+        y?: { phi_mm: number; spacing_cm: number; largo_total_m?: number; n?: number; kg?: number };
+      };
+
+      if (b.acero_kg != null)
+        r.push({ label: "Acero total", qty: b.acero_kg, unit: "kg", hint: (b.capas === 2 ? "2 capas" : "1 capa") });
+
+      if (b.x) {
+        r.push({ label: `Barras X Φ${b.x.phi_mm}`, qty: b.x.largo_total_m ?? 0, unit: "m", hint: `${b.x.n ?? 0} uds · e=${b.x.spacing_cm} cm` });
+        if (b.x.kg != null) r.push({ label: `Peso X Φ${b.x.phi_mm}`, qty: b.x.kg, unit: "kg" });
+      }
+      if (b.y) {
+        r.push({ label: `Barras Y Φ${b.y.phi_mm}`, qty: b.y.largo_total_m ?? 0, unit: "m", hint: `${b.y.n ?? 0} uds · e=${b.y.spacing_cm} cm` });
+        if (b.y.kg != null) r.push({ label: `Peso Y Φ${b.y.phi_mm}`, qty: b.y.kg, unit: "kg" });
+      }
     }
-  }
 
-  // volcamos desglose de materiales (cemento/cal/arena/piedra/agua) si lo hay
-  for (const [k, v] of Object.entries(matBreakdown)) {
-    rows.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
-  }
+    for (const [k, v] of Object.entries(matBreakdown)) {
+      r.push({ label: keyToLabel(k), qty: v, unit: keyToUnit(k) });
+    }
+    return r;
+  }, [res?.area_m2, res?.espesor_cm, res?.modo, res?.malla_kg, res?.malla_id, res?.meshDoubleLayer, res?.barras, vol, matBreakdown]);
 
-  // Ítems para el proyecto (MaterialRow[])
-  const itemsForProject: MaterialRow[] = useMemo(() => {
+  /* -------------------------- Ítems para Proyecto ------------------------- */
+
+  const itemsForProject = useMemo<MaterialRow[]>(() => {
     const out: MaterialRow[] = [];
 
     if (vol > 0) {
-      out.push({
-        key: "hormigon_m3",
-        label: `Hormigón ${concreteId}`,
-        qty: Math.round(vol * 100) / 100,
-        unit: "m3",
-      });
+      out.push({ key: "hormigon_m3", label: `Hormigón ${concreteId}`, qty: Math.round(vol * 100) / 100, unit: "m3" });
     }
 
-    // acero
     if (res?.modo === "malla" && typeof res.malla_kg === "number") {
-      out.push({
-        key: `malla_${res.malla_id}_kg`,
-        label: `Malla ${res.malla_id}`,
-        qty: Math.round(res.malla_kg * 100) / 100,
-        unit: "kg",
-      });
-    }
-    if (res?.modo === "barras" && typeof res.barras?.acero_kg === "number") {
-      out.push({
-        key: "acero_barras_kg",
-        label: "Acero en barras",
-        qty: Math.round(res.barras.acero_kg * 100) / 100,
-        unit: "kg",
-      });
+      out.push({ key: `malla_${res.malla_id}_kg`, label: `Malla ${res.malla_id}`, qty: Math.round(res.malla_kg * 100) / 100, unit: "kg" });
     }
 
-    // desglose de hormigón
+    if (res?.modo === "barras" && typeof res.barras?.acero_kg === "number") {
+      out.push({ key: "acero_barras_kg", label: "Acero en barras", qty: Math.round(res.barras.acero_kg * 100) / 100, unit: "kg" });
+    }
+
     for (const [k, v] of Object.entries(matBreakdown)) {
-      out.push({
-        key: k,
-        label: keyToLabel(k),
-        qty: Math.round((Number(v) || 0) * 100) / 100,
-        unit: normalizeUnit(keyToUnit(k) as any),
-      });
+      out.push({ key: k, label: keyToLabel(k), qty: Math.round((Number(v) || 0) * 100) / 100, unit: normalizeUnit(keyToUnit(k)) });
     }
 
     return out;
-  }, [vol, res?.modo, res?.malla_kg, res?.malla_id, res?.barras?.acero_kg, concreteId, JSON.stringify(matBreakdown)]);
+  }, [vol, res?.modo, res?.malla_kg, res?.malla_id, res?.barras?.acero_kg, concreteId, matBreakdown]);
 
   const defaultTitle = `Base ${L}×${B} e=${Hcm}cm`;
 
-  // (A) Lote local
-  type BatchItem = {
-    kind: "base";
-    title: string;
-    materials: MaterialRow[];
-    inputs: any;
-    outputs: Record<string, any>;
-  };
+  /* ------------------------------- Lote local ------------------------------ */
+
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    const inputs = {
-      L,
-      B,
-      Hcm,
+    const inputs: BaseInputs = {
+      L, B, Hcm,
       concreteClassId: concreteId,
       wastePct: waste,
       cover_cm: cover,
       mallaId: useMesh ? meshId : "",
       meshDoubleLayer,
-      bars: useMesh
-        ? undefined
-        : {
-            phi_x_mm: phiX,
-            spacing_x_cm: sX,
-            phi_y_mm: phiY,
-            spacing_y_cm: sY,
-            doubleLayer,
-          },
+      bars: useMesh ? undefined : {
+        phi_x_mm: phiX,
+        spacing_x_cm: sX,
+        phi_y_mm: phiY,
+        spacing_y_cm: sY,
+        doubleLayer,
+      },
     };
 
     const item: BatchItem = {
@@ -347,14 +343,12 @@ function BaseCalculator() {
       title: defaultTitle,
       materials: itemsForProject,
       inputs,
-      outputs: res as any,
+      outputs: res as BaseOutputs,
     };
 
-    setBatch((prev) => {
+    setBatch(prev => {
       if (editIndex !== null) {
-        const next = [...prev];
-        next[editIndex] = item;
-        return next;
+        const next = [...prev]; next[editIndex] = item; return next;
       }
       return [...prev, item];
     });
@@ -364,13 +358,14 @@ function BaseCalculator() {
   const handleEditFromBatch = (index: number) => {
     const it = batch[index];
     if (!it) return;
-    const inp = it.inputs || {};
-    setL(inp.L ?? L);
-    setB(inp.B ?? B);
-    setHcm(inp.Hcm ?? Hcm);
-    setConcreteId(inp.concreteClassId ?? concreteId);
-    setWaste(inp.wastePct ?? waste);
-    setCover(inp.cover_cm ?? cover);
+    const inp = it.inputs;
+
+    setL(inp.L);
+    setB(inp.B);
+    setHcm(inp.Hcm);
+    setConcreteId(inp.concreteClassId);
+    setWaste(inp.wastePct);
+    setCover(inp.cover_cm);
 
     const hasMesh = !!inp.mallaId;
     setUseMesh(hasMesh);
@@ -378,49 +373,49 @@ function BaseCalculator() {
       setMeshId(inp.mallaId);
       setMeshDoubleLayer(!!inp.meshDoubleLayer);
     } else if (inp.bars) {
-      setPhiX(inp.bars.phi_x_mm ?? phiX);
-      setSX(inp.bars.spacing_x_cm ?? sX);
-      setPhiY(inp.bars.phi_y_mm ?? phiY);
-      setSY(inp.bars.spacing_y_cm ?? sY);
+      setPhiX(inp.bars.phi_x_mm);
+      setSX(inp.bars.spacing_x_cm);
+      setPhiY(inp.bars.phi_y_mm);
+      setSY(inp.bars.spacing_y_cm);
       setDoubleLayer(!!inp.bars.doubleLayer);
     }
     setEditIndex(index);
   };
 
   const handleRemoveFromBatch = (index: number) => {
-    setBatch((prev) => prev.filter((_, i) => i !== index));
+    setBatch(prev => prev.filter((_, i) => i !== index));
     if (editIndex === index) setEditIndex(null);
   };
 
-  // (C) Actualizar partida (si venimos por deep-link)
+  /* ---------------------------- Deep-link update --------------------------- */
+
   const handleUpdatePartida = () => {
     if (!projectId || !partidaId) return;
+    const inputs: BaseInputs = {
+      L, B, Hcm,
+      concreteClassId: concreteId,
+      wastePct: waste,
+      cover_cm: cover,
+      mallaId: useMesh ? meshId : "",
+      meshDoubleLayer,
+      bars: useMesh ? undefined : {
+        phi_x_mm: phiX,
+        spacing_x_cm: sX,
+        phi_y_mm: phiY,
+        spacing_y_cm: sY,
+        doubleLayer,
+      },
+    };
     updatePartida(projectId, partidaId, {
       title: defaultTitle,
-      inputs: {
-        L,
-        B,
-        Hcm,
-        concreteClassId: concreteId,
-        wastePct: waste,
-        cover_cm: cover,
-        mallaId: useMesh ? meshId : "",
-        meshDoubleLayer,
-        bars: useMesh
-          ? undefined
-          : {
-              phi_x_mm: phiX,
-              spacing_x_cm: sX,
-              phi_y_mm: phiY,
-              spacing_y_cm: sY,
-              doubleLayer,
-            },
-      },
-      outputs: res as any,
+      inputs,
+      outputs: res as BaseOutputs,
       materials: itemsForProject,
     });
     alert("Partida actualizada.");
   };
+
+  /* --------------------------------- UI ----------------------------------- */
 
   return (
     <section className="space-y-6">
@@ -432,163 +427,70 @@ function BaseCalculator() {
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
               Clase de hormigón
-              <select
-                value={concreteId}
-                onChange={(e) => setConcreteId(e.target.value)}
-                className="w-full px-3 py-2"
-              >
+              <select value={concreteId} onChange={(e) => setConcreteId(e.target.value)} className="w-full px-3 py-2">
                 {concreteOpts.map((c, i) => (
-                  <option key={`${c.key}-${i}`} value={c.key}>
-                    {c.label}
-                  </option>
+                  <option key={`${c.key}-${i}`} value={c.key}>{c.label}</option>
                 ))}
               </select>
             </label>
 
-            <label className="text-sm">
-              Largo (m)
-              <input
-                type="number"
-                value={L}
-                onChange={(e) => setL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
+            <label className="text-sm">Largo (m)
+              <input type="number" value={L} onChange={(e) => setL(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-            <label className="text-sm">
-              Ancho (m)
-              <input
-                type="number"
-                value={B}
-                onChange={(e) => setB(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
+            <label className="text-sm">Ancho (m)
+              <input type="number" value={B} onChange={(e) => setB(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-
-            <label className="text-sm">
-              Espesor (cm)
-              <input
-                type="number"
-                value={Hcm}
-                onChange={(e) => setHcm(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
+            <label className="text-sm">Espesor (cm)
+              <input type="number" value={Hcm} onChange={(e) => setHcm(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-
-            <label className="text-sm">
-              Recubrimiento (cm)
-              <input
-                type="number"
-                value={cover}
-                onChange={(e) => setCover(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
+            <label className="text-sm">Recubrimiento (cm)
+              <input type="number" value={cover} onChange={(e) => setCover(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-
-            <label className="text-sm col-span-2">
-              Desperdicio (%)
-              <input
-                type="number"
-                value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
+            <label className="text-sm col-span-2">Desperdicio (%)
+              <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
           </div>
 
-          {/* Selector de modo: malla o barras */}
+          {/* Selector de modo */}
           <div className="grid grid-cols-1 gap-2">
             <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={useMesh}
-                onChange={(e) => setUseMesh(e.target.checked)}
-              />
+              <input type="checkbox" checked={useMesh} onChange={(e) => setUseMesh(e.target.checked)} />
               Usar malla SIMA (en vez de barras)
             </label>
           </div>
 
           {useMesh ? (
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm col-span-2">
-                Malla SIMA
-                <select
-                  value={meshId}
-                  onChange={(e) => setMeshId(e.target.value)}
-                  className="w-full px-3 py-2"
-                >
-                  {meshOpts.map((m, i) => (
-                    <option key={`${m.key}-${i}`} value={m.key}>
-                      {m.label}
-                    </option>
-                  ))}
+              <label className="text-sm col-span-2">Malla SIMA
+                <select value={meshId} onChange={(e) => setMeshId(e.target.value)} className="w-full px-3 py-2">
+                  {meshOpts.map((m, i) => <option key={`${m.key}-${i}`} value={m.key}>{m.label}</option>)}
                 </select>
               </label>
-
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={meshDoubleLayer}
-                  onChange={(e) => setMeshDoubleLayer(e.target.checked)}
-                />
+                <input type="checkbox" checked={meshDoubleLayer} onChange={(e) => setMeshDoubleLayer(e.target.checked)} />
                 Doble capa de malla
               </label>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">
-                Φ barras X (mm)
-                <select
-                  value={phiX}
-                  onChange={(e) => setPhiX(+e.target.value)}
-                  className="w-full px-3 py-2"
-                >
-                  {rebarOpts.map((r, i) => (
-                    <option key={`rx-${r.key}-${i}`} value={r.phi_mm}>
-                      {r.label}
-                    </option>
-                  ))}
+              <label className="text-sm">Φ barras X (mm)
+                <select value={phiX} onChange={(e) => setPhiX(+e.target.value)} className="w-full px-3 py-2">
+                  {rebarOpts.map((r, i) => <option key={`rx-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>)}
                 </select>
               </label>
-              <label className="text-sm">
-                Separación X (cm)
-                <input
-                  type="number"
-                  value={sX}
-                  onChange={(e) => setSX(+e.target.value || 0)}
-                  className="w-full px-3 py-2"
-                />
+              <label className="text-sm">Separación X (cm)
+                <input type="number" value={sX} onChange={(e) => setSX(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
-
-              <label className="text-sm">
-                Φ barras Y (mm)
-                <select
-                  value={phiY}
-                  onChange={(e) => setPhiY(+e.target.value)}
-                  className="w-full px-3 py-2"
-                >
-                  {rebarOpts.map((r, i) => (
-                    <option key={`ry-${r.key}-${i}`} value={r.phi_mm}>
-                      {r.label}
-                    </option>
-                  ))}
+              <label className="text-sm">Φ barras Y (mm)
+                <select value={phiY} onChange={(e) => setPhiY(+e.target.value)} className="w-full px-3 py-2">
+                  {rebarOpts.map((r, i) => <option key={`ry-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>)}
                 </select>
               </label>
-              <label className="text-sm">
-                Separación Y (cm)
-                <input
-                  type="number"
-                  value={sY}
-                  onChange={(e) => setSY(+e.target.value || 0)}
-                  className="w-full px-3 py-2"
-                />
+              <label className="text-sm">Separación Y (cm)
+                <input type="number" value={sY} onChange={(e) => setSY(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
-
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={doubleLayer}
-                  onChange={(e) => setDoubleLayer(e.target.checked)}
-                />
+                <input type="checkbox" checked={doubleLayer} onChange={(e) => setDoubleLayer(e.target.checked)} />
                 Doble capa de barras
               </label>
             </div>
@@ -601,28 +503,19 @@ function BaseCalculator() {
         </div>
       </div>
 
-      {/* Botón actualizar cuando venimos por deep-link */}
+      {/* Deep-link update */}
       {projectId && partidaId ? (
         <div>
-          <button
-            type="button"
-            className="rounded border px-3 py-2"
-            onClick={handleUpdatePartida}
-          >
+          <button type="button" className="rounded border px-3 py-2" onClick={handleUpdatePartida}>
             Actualizar partida
           </button>
         </div>
       ) : null}
 
-      {/* Agregar al proyecto (unitario) */}
-      <AddToProject
-        kind="base"
-        defaultTitle={defaultTitle}
-        items={itemsForProject}
-        raw={res}
-      />
+      {/* Guardar unitario */}
+      <AddToProject kind="base" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
 
-      {/* (A) Lote local */}
+      {/* Lote local */}
       {batch.length > 0 && (
         <div className="card p-4 space-y-3 mt-4">
           <h2 className="font-medium">Lote local (Base)</h2>
@@ -642,20 +535,12 @@ function BaseCalculator() {
             onSaved={() => setBatch([])}
           />
           <div className="pt-2">
-            <button
-              type="button"
-              className="rounded border px-4 py-2"
-              onClick={addCurrentToBatch}
-              title={editIndex !== null ? "Guardar ítem del lote" : "Añadir base al lote"}
-            >
+            <button type="button" className="rounded border px-4 py-2" onClick={addCurrentToBatch}
+              title={editIndex !== null ? "Guardar ítem del lote" : "Añadir base al lote"}>
               {editIndex !== null ? "Guardar ítem del lote" : "Añadir base al lote"}
             </button>
             {editIndex !== null && (
-              <button
-                type="button"
-                className="rounded border px-3 py-2 ml-2"
-                onClick={() => setEditIndex(null)}
-              >
+              <button type="button" className="rounded border px-3 py-2 ml-2" onClick={() => setEditIndex(null)}>
                 Cancelar edición
               </button>
             )}
@@ -666,9 +551,7 @@ function BaseCalculator() {
   );
 }
 
-
-// Este es el componente de página que se exporta por defecto.
-// Envuelve el calculador en <Suspense> para evitar el error de build.
+/* Wrapper con Suspense */
 export default function BasePage() {
   return (
     <Suspense fallback={<div>Cargando calculadora...</div>}>

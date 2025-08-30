@@ -1,140 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  listProjects,
-  createProject,
-  addPartida,
-  getActiveProjectId,   // ← NUEVO
-  setActiveProjectId,   // ← NUEVO
-} from "@/lib/project/storage";
-import { rowsToMaterials } from "@/lib/project/helpers";
-import type { PartidaKind } from "@/lib/project/types";
+import { useEffect, useMemo, useState } from "react";
+import { listProjects, createProject, saveOrUpdatePartidaByKind } from "@/lib/project/storage";
+import type { Unit, MaterialLine } from "@/lib/project/types";
 
-type Props = {
-  kind: PartidaKind;
+type DisplayItem = { key?: string; label: string; qty: number; unit: string };
+
+interface Props {
+  kind: string;
   defaultTitle: string;
-  items: Array<{ key?: string; label: string; qty: number; unit: string }>;
-  raw?: any;
-};
+  items: DisplayItem[];
+  raw: unknown;
+}
 
-export default function AddToProject({
-  kind,
-  defaultTitle,
-  items,
-  raw,
-}: Props) {
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+const toUnit = (u?: string): Unit =>
+  u === "m²" ? "m2" :
+  u === "m³" ? "m3" :
+  u === "bolsas" ? "u" :
+  (["u","m","m2","m3","kg","l"] as const).includes((u ?? "") as Unit) ? (u as Unit) : "u";
+
+export default function AddToProject({ kind, defaultTitle, items, raw }: Props) {
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [projectId, setProjectId] = useState<string>("");
-  const [newName, setNewName] = useState("");
-  const [title, setTitle] = useState(defaultTitle);
-  const [saving, setSaving] = useState(false);
-
-  // Mantener sincronizado si cambia defaultTitle desde el padre
-  useEffect(() => {
-    setTitle(defaultTitle);
-  }, [defaultTitle]);
+  const [newName, setNewName] = useState<string>("");
 
   useEffect(() => {
-    const list = listProjects();
-    setProjects(list);
-
-    // Preseleccionar proyecto activo si existe y está en la lista
-    const activeId = getActiveProjectId?.();
-    if (activeId && list.some(p => p.id === activeId)) {
-      setProjectId(activeId);
-    }
+    (async () => {
+      const rows = await listProjects();
+      setProjects(rows.map(r => ({ id: r.id, name: r.name })));
+      if (rows.length) setProjectId(rows[0].id);
+    })();
   }, []);
 
-  async function handleAdd() {
-    if (!items?.length) return;
+  const materials: MaterialLine[] = useMemo(() => {
+    return items.map((m, idx) => ({
+      key: (m.key && m.key.trim()) || `it_${idx}`,
+      label: m.label,
+      qty: Number.isFinite(m.qty) ? m.qty : 0,
+      unit: toUnit(m.unit),
+    }));
+  }, [items]);
 
-    setSaving(true);
-    try {
-      let targetId = projectId;
+  async function handleCreateAndSave() {
+    if (!newName.trim()) return;
+    const p = await createProject({ name: newName.trim() });
+    await saveOrUpdatePartidaByKind(p.id, kind, {
+      title: defaultTitle,
+      inputs: { raw },
+      outputs: { raw },
+      materials,
+    });
+    setNewName("");
+    const rows = await listProjects();
+    setProjects(rows.map(r => ({ id: r.id, name: r.name })));
+    setProjectId(p.id);
+  }
 
-      // ¿Nuevo proyecto?
-      if (!targetId) {
-        const name = newName.trim() || "Proyecto sin nombre";
-        const p = createProject({ name });
-        targetId = p.id;
-        // fijar como activo al crear
-        setActiveProjectId?.(targetId);
-      }
-
-      await addPartida(targetId, {
-        kind,
-        title: (title || "").trim() || defaultTitle,
-        inputs: {},
-        outputs: raw ?? {},
-        materials: rowsToMaterials(items),
-      });
-
-      // Si el usuario eligió un proyecto existente, mantenerlo activo
-      if (targetId && targetId !== getActiveProjectId?.()) {
-        setActiveProjectId?.(targetId);
-      }
-
-      alert("Partida agregada al proyecto ✅");
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo guardar la partida 😕");
-    } finally {
-      setSaving(false);
-    }
+  async function handleSave() {
+    if (!projectId) return;
+    await saveOrUpdatePartidaByKind(projectId, kind, {
+      title: defaultTitle,
+      inputs: { raw },
+      outputs: { raw },
+      materials,
+    });
   }
 
   return (
     <div className="card p-4 space-y-3">
-      <h3 className="font-medium">Agregar al proyecto</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Guardar en proyecto</h3>
+      </div>
 
-      <label className="text-sm block">
-        Título de partida
-        <input
-          className="w-full px-3 py-2 mt-1"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={defaultTitle}
-        />
-      </label>
-
-      <div className="grid md:grid-cols-2 gap-3">
-        <label className="text-sm block">
-          Proyecto existente
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Proyecto</span>
           <select
-            className="w-full px-3 py-2 mt-1"
             value={projectId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setProjectId(val);
-              if (val) setActiveProjectId?.(val); // mantener activo al cambiar
-            }}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="rounded border px-3 py-2"
           >
-            <option value="">— Crear nuevo —</option>
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </label>
 
-        {!projectId && (
-          <label className="text-sm block">
-            Nombre del nuevo proyecto
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Crear nuevo</span>
+          <div className="flex gap-2">
             <input
-              className="w-full px-3 py-2 mt-1"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Ej.: Casa López"
+              placeholder="Nombre del proyecto"
+              className="flex-1 rounded border px-3 py-2"
             />
-          </label>
-        )}
+            <button type="button" className="btn btn-secondary" onClick={handleCreateAndSave}>
+              Crear y guardar
+            </button>
+          </div>
+        </div>
       </div>
 
-      <button className="btn" disabled={saving} onClick={handleAdd}>
-        {saving ? "Guardando…" : "Agregar al proyecto"}
-      </button>
+      <div className="flex gap-2">
+        <button type="button" className="btn btn-primary" onClick={handleSave}>
+          Guardar en proyecto
+        </button>
+      </div>
     </div>
   );
 }

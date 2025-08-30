@@ -1,21 +1,20 @@
 "use client";
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useJson } from "@/lib/data/useJson";
-// @ts-ignore – desacoplado de la firma exacta
 import * as C from "@/lib/calc/contrapiso";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import AddToProject from "@/components/ui/AddToProject";
-
-// (A) Lote local
 import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
 import BatchList from "@/components/ui/BatchList";
 import type { MaterialRow, Unit } from "@/lib/project/types";
+import { toUnit } from "@/lib/project/helpers";
 
-// (C) Deep-link edición
+// Deep-link edición
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 
+/* ----------------------------- Tipos de datos ----------------------------- */
 type CptoOptions = {
   tipos?: { key?: string; label?: string }[];
   mallas?: { key?: string; label?: string }[];
@@ -33,36 +32,40 @@ type CptoCoeffs = Array<{
   malla_por_tipo?: Record<string, { m2_por_m2?: number }>;
 }>;
 
-// ---------- helpers de unidad (evita errores de tipo Unit) ----------
-function normalizeUnit(u: string): Unit {
-  const s = (u || "").toLowerCase();
-  if (s === "m²" || s === "m2") return "m2";
-  if (s === "m³" || s === "m3") return "m3";
-  if (s === "kg") return "kg";
-  if (s === "l" || s === "lt" || s === "litros") return "l";
-  if (s === "u" || s === "unidades") return "u";
-  if (s === "m" || s === "metros") return "m";
-  return "u";
-}
+// Resultado mínimo que usamos desde el módulo de cálculo
+type ContrapisoResult = {
+  area_m2?: number;
+  espesor_cm?: number;
+  volumen_m3?: number;
+  volumen_con_desperdicio_m3?: number;
+  malla_m2?: number;
+  materiales?: Record<string, number>;
+  // permitir campos extra sin any
+  [k: string]: unknown;
+};
 
-// ---------- tipos lote ----------
+// Inputs que guardamos en la partida
+type SavedInputs = {
+  tipo: string;
+  L: number;
+  A: number;
+  H: number;     // cm
+  malla: string; // key o ""
+  waste: number; // %
+};
+
+// Lote local
 type BatchItem = {
   kind: "contrapiso";
   title: string;
   materials: MaterialRow[];
-  inputs: {
-    tipo: string;
-    L: number;
-    A: number;
-    H: number;     // cm
-    malla: string; // key o ""
-    waste: number; // %
-  };
-  outputs: Record<string, any>;
+  inputs: SavedInputs;
+  outputs: Record<string, unknown>;
 };
 
+/* ------------------------------- Componente ------------------------------- */
 function ContrapisoCalculator() {
-  // (C) Deep-link edición
+  // Deep-link edición
   const sp = useSearchParams();
   const projectId = sp.get("projectId");
   const partidaId = sp.get("partidaId");
@@ -76,7 +79,6 @@ function ContrapisoCalculator() {
     ],
     mallas: [{ key: "sima_q188", label: "SIMA Q-188 (15x15 Ø6)" }],
   });
-
   const coeffs = useJson<CptoCoeffs>("/data/contrapiso_coeffs.json", []);
 
   // normalizo arrays (garantizo key/label siempre)
@@ -90,7 +92,6 @@ function ContrapisoCalculator() {
         : [],
     [options.tipos]
   );
-
   const mallas = useMemo(
     () =>
       Array.isArray(options.mallas)
@@ -117,7 +118,6 @@ function ContrapisoCalculator() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipos]);
-
   useEffect(() => {
     if (mallas.length && malla && !mallas.find((m) => m.key === malla)) {
       setMalla(mallas[0].key);
@@ -125,36 +125,43 @@ function ContrapisoCalculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mallas]);
 
-  // (C) si viene deep-link, precargo inputs desde la partida
+  // Precarga si viene deep-link: leer partida (async)
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    if (p?.inputs) {
-      const inp = p.inputs as any;
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      if (!p?.inputs) return;
+      const inp = p.inputs as Partial<SavedInputs>;
       if (typeof inp.tipo === "string") setTipo(inp.tipo);
       if (typeof inp.L === "number") setL(inp.L);
       if (typeof inp.A === "number") setA(inp.A);
-      if (typeof inp.H === "number") setH(inp.H);           // guardamos H en cm
+      if (typeof inp.H === "number") setH(inp.H);
       if (typeof inp.malla === "string") setMalla(inp.malla);
       if (typeof inp.waste === "number") setWaste(inp.waste);
-    }
+    })();
   }, [projectId, partidaId]);
 
-  // cálculo (desacoplado)
-  const r = useMemo(() => {
+  // cálculo (intento calcContrapiso, si no default; si no, objeto vacío)
+  const r: ContrapisoResult = useMemo(() => {
     const input = { tipo, L, A, Hcm: H, malla, wastePct: waste, coeffs };
-    // @ts-ignore
-    return (C.calcContrapiso ?? C.default ?? ((x: any) => x))(input);
+    type CalcFn = (i: typeof input) => ContrapisoResult;
+    const mod = C as unknown as { calcContrapiso?: CalcFn; default?: CalcFn };
+    const fn: CalcFn | undefined = typeof mod.calcContrapiso === "function"
+      ? mod.calcContrapiso
+      : typeof mod.default === "function"
+        ? mod.default
+        : undefined;
+    return fn ? fn(input) : {};
   }, [tipo, L, A, H, malla, waste, coeffs]);
 
-  // ------ desglosar materiales completos (B) ------
+  // valores geométricos auxiliares
   const area_m2: number | undefined =
-    typeof r?.area_m2 === "number" ? r.area_m2 : (L || 0) * (A || 0);
+    typeof r.area_m2 === "number" ? r.area_m2 : (L || 0) * (A || 0);
 
   const volumen_m3: number = (() => {
-    if (typeof r?.volumen_con_desperdicio_m3 === "number")
+    if (typeof r.volumen_con_desperdicio_m3 === "number")
       return r.volumen_con_desperdicio_m3;
-    if (typeof r?.volumen_m3 === "number") return r.volumen_m3;
+    if (typeof r.volumen_m3 === "number") return r.volumen_m3;
     // fallback geométrico con desperdicio
     const base = (L || 0) * (A || 0) * (H || 0) / 100; // H en cm → m
     return base * (1 + (waste || 0) / 100);
@@ -165,12 +172,12 @@ function ContrapisoCalculator() {
     [coeffs, tipo]
   );
 
-  // arranca de lo que ya venga en el cálculo (si existe)
+  // desglosado de materiales acumulado
   const matAcum: Record<string, number> = useMemo(() => {
     const out: Record<string, number> = {};
-    if (r?.materiales && typeof r.materiales === "object") {
+    if (r.materiales && typeof r.materiales === "object") {
       for (const [k, v] of Object.entries(r.materiales)) {
-        out[k] = Number(v) || 0;
+        out[k] = typeof v === "number" && Number.isFinite(v) ? v : 0;
       }
     }
     // completa por coeficientes (por m3)
@@ -194,27 +201,27 @@ function ContrapisoCalculator() {
         );
     }
     // malla (si el cálculo no la dio y hay coeficiente por m2)
-    if (typeof r?.malla_m2 !== "number" && tipoCoef?.malla_por_tipo && area_m2) {
+    if (typeof r.malla_m2 !== "number" && tipoCoef?.malla_por_tipo && area_m2) {
       const mCfg = tipoCoef.malla_por_tipo[malla || ""] || undefined;
       if (mCfg?.m2_por_m2 && mCfg.m2_por_m2 > 0) {
         out.malla_sima = Math.round(area_m2 * mCfg.m2_por_m2 * 100) / 100;
       }
     }
     return out;
-  }, [r?.materiales, r?.malla_m2, tipoCoef, volumen_m3, area_m2, malla]);
+  }, [r.materiales, r.malla_m2, tipoCoef, volumen_m3, area_m2, malla]);
 
   // filas para tabla (solo números)
   const rows: ResultRow[] = useMemo(() => {
     const out: ResultRow[] = [];
     if (typeof area_m2 === "number")
       out.push({ label: "Área", qty: Math.round(area_m2 * 100) / 100, unit: "m²" });
-    if (typeof r?.espesor_cm === "number")
+    if (typeof r.espesor_cm === "number")
       out.push({ label: "Espesor", qty: Math.round(r.espesor_cm * 100) / 100, unit: "cm" });
     if (typeof volumen_m3 === "number" && volumen_m3 > 0)
       out.push({ label: "Volumen", qty: Math.round(volumen_m3 * 100) / 100, unit: "m³" });
 
     // malla resultante del cálculo (si vino)
-    if (typeof r?.malla_m2 === "number" && r.malla_m2 > 0)
+    if (typeof r.malla_m2 === "number" && r.malla_m2 > 0)
       out.push({ label: "Malla SIMA", qty: Math.round(r.malla_m2 * 100) / 100, unit: "m²" });
 
     // desglosado completo
@@ -223,7 +230,7 @@ function ContrapisoCalculator() {
       out.push({ label: keyToLabel(k), qty, unit: keyToUnit(k) });
     }
     return out;
-  }, [area_m2, r?.espesor_cm, volumen_m3, r?.malla_m2, matAcum]);
+  }, [area_m2, r.espesor_cm, volumen_m3, r.malla_m2, matAcum]);
 
   // materiales para Proyecto (MaterialRow[])
   const itemsForProject = useMemo<MaterialRow[]>(() => {
@@ -233,11 +240,11 @@ function ContrapisoCalculator() {
         key: k,
         label: keyToLabel(k),
         qty: Math.round((Number(v) || 0) * 100) / 100,
-        unit: normalizeUnit(keyToUnit(k)),
+        unit: toUnit(keyToUnit(k)),
       });
     }
     // si el cálculo trajo malla en m², la agrego como material (clave estable)
-    if (typeof r?.malla_m2 === "number" && r.malla_m2 > 0) {
+    if (typeof r.malla_m2 === "number" && r.malla_m2 > 0) {
       list.push({
         key: "malla_sima",
         label: "Malla SIMA",
@@ -246,7 +253,7 @@ function ContrapisoCalculator() {
       });
     }
     return list;
-  }, [matAcum, r?.malla_m2]);
+  }, [matAcum, r.malla_m2]);
 
   // título por defecto para la partida
   const defaultTitle = useMemo(() => {
@@ -256,25 +263,23 @@ function ContrapisoCalculator() {
     return `Contrapiso ${L}×${A} m · e=${H} cm · ${tipo}${mallaTxt}`;
   }, [L, A, H, tipo, malla, mallas]);
 
-  // ------------------- (A) Lote local -------------------
+  // Lote local
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const addCurrentToBatch = () => {
-    // rehago materiales igual que itemsForProject para mantener consistencia
     const materials: MaterialRow[] = itemsForProject.map((m) => ({
       ...m,
-      unit: normalizeUnit(m.unit as unknown as string),
+      unit: toUnit(m.unit as unknown as string),
     }));
-
+    const outputs = r as unknown as Record<string, unknown>;
     const item: BatchItem = {
       kind: "contrapiso",
       title: defaultTitle,
       materials,
       inputs: { tipo, L, A, H, malla, waste },
-      outputs: r as any,
+      outputs,
     };
-
     setBatch((prev) => {
       if (editIndex !== null) {
         const next = [...prev];
@@ -303,19 +308,21 @@ function ContrapisoCalculator() {
     if (editIndex === index) setEditIndex(null);
   };
 
-  // ------------------- (C) Actualizar partida -------------------
-  const handleUpdatePartida = () => {
+  // Actualizar partida (modo edición)
+  const handleUpdatePartida = async () => {
     if (!projectId || !partidaId) return;
     const materials: MaterialRow[] = itemsForProject.map((m) => ({
       ...m,
-      unit: normalizeUnit(m.unit as unknown as string),
+      unit: toUnit(m.unit as unknown as string),
     }));
-    updatePartida(projectId, partidaId, {
+    const outputs = r as unknown as Record<string, unknown>;
+    await updatePartida(projectId, partidaId, {
       title: defaultTitle,
       inputs: { tipo, L, A, H, malla, waste },
-      outputs: r as any,
+      outputs,
       materials,
     });
+    // feedback mínimo
     alert("Partida actualizada.");
   };
 
@@ -445,7 +452,7 @@ function ContrapisoCalculator() {
         </div>
       </div>
 
-      {/* (A) Lote local */}
+      {/* Lote local */}
       {batch.length > 0 && (
         <div className="card p-4 space-y-3">
           <h2 className="font-medium">Lote local (Contrapiso)</h2>
@@ -473,15 +480,14 @@ function ContrapisoCalculator() {
           kind="contrapiso"
           defaultTitle={defaultTitle}
           items={itemsForProject}
-          raw={r}
+          raw={r as Record<string, unknown>}
         />
       )}
     </section>
   );
 }
 
-// Este es el componente de página que se exporta por defecto.
-// Envuelve el calculador en <Suspense> para evitar el error de build.
+// Página con Suspense para que useSearchParams no rompa en build
 export default function ContrapisoPage() {
   return (
     <Suspense fallback={<div>Cargando calculadora...</div>}>

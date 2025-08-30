@@ -1,23 +1,32 @@
-@import "tailwindcss";
+/* Tailwind v4: módulos recomendados (igual que Gasista) */
+@import "tailwindcss/preflight";
+@import "tailwindcss/theme";
+@tailwind utilities;
 
-/* ===== Paleta (tuya) ===== */
+/* ===== Paleta base (modo oscuro por defecto) ===== */
 :root{
+  color-scheme: dark;
+  accent-color: #0E8388;
+
   --color-primary:   #2C3333; /* fondo principal */
   --color-secondary: #2E4F4F; /* barras / tarjetas */
   --color-accent:    #0E8388; /* botones / foco */
   --color-neutral:   #CBE4DE; /* texto principal */
   --color-base:      #00FFD1; /* detalles / énfasis */
 
-  /* Derivados semánticos (un solo modo) */
+  /* Derivados semánticos */
   --background: var(--color-primary);
   --foreground: var(--color-neutral);
   --card:       #242B2B;                 /* leve contraste sobre fondo */
   --muted:      #202626;                 /* superficies sutiles */
   --border:     #3A4747;                 /* líneas y bordes */
   --ring:       var(--color-accent);     /* focus-ring */
+
+  /* Radios globales */
+  --radius: 14px;
 }
 
-/* ===== Mapear a tokens de Tailwind v4 ===== */
+/* ===== Mapeo a tokens Tailwind v4 (@theme inline) ===== */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -29,20 +38,17 @@
   --color-border:     var(--border);
   --color-ring:       var(--ring);
 
-  /* Tipografías */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
                Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
                "Segoe UI Emoji";
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
                "Liberation Mono", "Courier New", monospace;
-
-  /* Radios globales (opcional) */
-  --radius: 14px;
 }
 
 /* ===== Base ===== */
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; max-width: 100%; overflow-x: hidden; }
+
 body{
   background: var(--background);
   color: var(--foreground);
@@ -58,27 +64,37 @@ body{
 }
 
 /* Links */
-a{ color: var(--color-base); }
+a{ color: var(--color-base); text-underline-offset: 2px; }
 a:hover{ opacity: .9; }
 
-/* Formularios por defecto (complementa tus clases de Tailwind) */
-input, select, textarea{
+/* ===== Formularios por defecto (coherente con Gasista) ===== */
+:where(input, select, textarea){
   background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--border);
   border-radius: 12px;
+  padding: .5rem .75rem;
 }
-input:focus, select:focus, textarea:focus{
+:where(input, select, textarea)::placeholder{ color: color-mix(in srgb, var(--color-neutral) 70%, black 30%); }
+:where(input, select, textarea):focus{
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 35%, transparent);
   border-color: var(--color-ring);
 }
+:where(button, [type="button"], [type="submit"]){ font: inherit; }
 
-/* ===== Utilidades mínimas (por si querés reusar) ===== */
+/* ===== Accesibilidad de foco ===== */
+*:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 38%, transparent);
+  border-color: var(--color-ring);
+}
+
+/* ===== Utilidades UI (botones / tarjetas) ===== */
 .btn{
   display:inline-flex; align-items:center; justify-content:center;
   gap:.5rem; padding:.5rem 1rem; border-radius: 9999px;
-  font-weight:600; transition: transform .04s ease, opacity .2s ease, background-color .2s ease;
+  font-weight:600; transition: transform .04s ease, opacity .2s ease, background-color .2s ease, border-color .2s ease;
   border:1px solid transparent;
 }
 .btn:active{ transform: translateY(1px); }
@@ -102,25 +118,45 @@ input:focus, select:focus, textarea:focus{
 }
 .btn-ghost:hover{ background: var(--muted); }
 
+/* Botón de peligro (paridad con Gasista) */
+.btn-danger{
+  background: #B91C1C; color: #FFEFEF;
+  border-color: #7F1D1D;
+}
+.btn-danger:hover{ background: #991B1B; }
+
+/* Tarjetas */
 .card{
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
-/* Tablas simples (para tus resultados) */
-.table{
-  width:100%; border-collapse: collapse; font-size: .95rem;
-}
-.table td, .table th{
-  padding:.5rem .75rem; border-bottom:1px solid var(--border);
-}
+/* Tablas simples (resultados) */
+.table{ width:100%; border-collapse: collapse; font-size: .95rem; }
+.table td, .table th{ padding:.5rem .75rem; border-bottom:1px solid var(--border); }
 .table th{ text-align:left; color: color-mix(in srgb, var(--color-neutral) 85%, white 15%); }
-
-html, body { max-width: 100%; overflow-x: hidden; }
 
 /* tablas dentro de tarjetas: scroll horizontal en pantallas chicas */
 .card--table {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* ===== Utilidades varias ===== */
+.visually-hidden{ position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+/* Reducir animaciones si el sistema lo pide */
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+
+/* ===== Impresión (paridad con Gasista) ===== */
+@media print{
+  :root{ color-scheme: light; }
+  body{ background: #ffffff; color: #111827; }
+  a{ color: inherit; text-decoration: none; }
+  .card{ background: #ffffff; border-color: #E5E7EB; }
+  .no-print{ display: none !important; }
+  .print\:show{ display: block !important; }
 }

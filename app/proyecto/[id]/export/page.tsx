@@ -1,22 +1,35 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getProject } from "@/lib/project/storage";
 import { aggregateMaterials } from "@/lib/project/compute";
+import type { Project as DBProject } from "@/lib/db";
 
 export default function ProyectoExportPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const p = getProject(id);
 
+  const [project, setProject] = useState<DBProject | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // carga inicial (async)
   useEffect(() => {
-    if (!p) router.replace("/proyecto");
-  }, [p, router]);
+    (async () => {
+      const p = await getProject(id);
+      if (!p) {
+        router.replace("/proyecto");
+        return;
+      }
+      setProject(p);
+      setLoading(false);
+    })();
+  }, [id, router]);
 
-  if (!p) return null;
+  if (loading) return <div className="mx-auto max-w-[840px] p-6">Cargando…</div>;
+  if (!project) return null;
 
-  const mat = aggregateMaterials(p);
-  const date = new Date().toLocaleDateString();
+  const mat = useMemo(() => aggregateMaterials(project), [project]);
+  const date = new Date().toLocaleDateString("es-AR");
 
   function onPrint() {
     window.print();
@@ -39,8 +52,8 @@ export default function ProyectoExportPage() {
       `}</style>
 
       <div className="no-print flex justify-between items-center mb-4">
-        <button onClick={() => router.back()} className="btn-secondary">← Volver</button>
-        <button onClick={onPrint} className="btn">Imprimir / Guardar PDF</button>
+        <button onClick={() => router.back()} className="btn btn-secondary">← Volver</button>
+        <button onClick={onPrint} className="btn btn-primary">Imprimir / Guardar PDF</button>
       </div>
 
       {/* Encabezado */}
@@ -48,18 +61,20 @@ export default function ProyectoExportPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="title">Presupuesto de materiales</h1>
-            <div className="muted">Proyecto: <strong>{p.name}</strong></div>
-            {p.client ? <div className="muted">Cliente: {p.client}</div> : null}
-            {p.siteAddress ? <div className="muted">Obra: {p.siteAddress}</div> : null}
-            {p.contact ? <div className="muted">Contacto: {p.contact}</div> : null}
+            <div className="muted">Proyecto: <strong>{project.name}</strong></div>
+            {project.client ? <div className="muted">Cliente: {project.client}</div> : null}
+            {project.siteAddress ? <div className="muted">Obra: {project.siteAddress}</div> : null}
+            {"contact" in project && project.contact ? (
+              <div className="muted">Contacto: {project.contact as string}</div>
+            ) : null}
             <div className="muted">Fecha: {date}</div>
           </div>
-          {p.logoUrl ? (
+          {"logoUrl" in project && project.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.logoUrl} alt="Logo" style={{maxWidth: 120, maxHeight: 80}} />
+            <img src={project.logoUrl as string} alt="Logo" style={{ maxWidth: 120, maxHeight: 80 }} />
           ) : null}
         </div>
-        {p.notes ? <p className="mt-3">{p.notes}</p> : null}
+        {project.notes ? <p className="mt-3">{project.notes}</p> : null}
       </header>
 
       {/* Resumen de materiales */}
@@ -92,7 +107,7 @@ export default function ProyectoExportPage() {
       {/* Partidas */}
       <section>
         <h2 className="font-medium mb-2">Partidas incluidas</h2>
-        {p.partes.length === 0 ? (
+        {project.partes.length === 0 ? (
           <div className="muted">No hay partidas cargadas.</div>
         ) : (
           <table className="w-full tbl">
@@ -104,11 +119,11 @@ export default function ProyectoExportPage() {
               </tr>
             </thead>
             <tbody>
-              {p.partes.map(part => (
+              {project.partes.map(part => (
                 <tr key={part.id}>
                   <td>{part.title}</td>
                   <td>{part.kind}</td>
-                  <td>{new Date(part.createdAt).toLocaleDateString()}</td>
+                  <td>{new Date(part.createdAt).toLocaleDateString("es-AR")}</td>
                 </tr>
               ))}
             </tbody>

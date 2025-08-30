@@ -1,27 +1,35 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react"; // Importamos useState
-import { listProjects, setActiveProjectId, deleteProject } from "@/lib/project/storage"; // Importamos deleteProject
+import { useEffect, useState } from "react";
+import { listProjects, setActiveProjectId, removeProject } from "@/lib/project/storage";
 
 export default function ProyectosPage() {
-  // Estado para manejar la lista de proyectos dinámicamente
-  const [projects, setProjects] = useState(() => listProjects());
+  const [projects, setProjects] = useState<Array<{ id: string; name: string; client?: string }>>([]);
 
-  // Función para manejar la eliminación
-  const handleDelete = (projectId: string, projectName: string) => {
-    // Usamos el confirm nativo por ahora
+  useEffect(() => {
+    (async () => {
+      const rows = await listProjects();
+      setProjects(rows.map(p => ({ id: p.id, name: p.name, client: p.client })));
+    })();
+  }, []);
+
+  async function refresh() {
+    const rows = await listProjects();
+    setProjects(rows.map(p => ({ id: p.id, name: p.name, client: p.client })));
+  }
+
+  const handleDelete = async (projectId: string, projectName: string) => {
     if (window.confirm(`¿Estás seguro de que querés eliminar el proyecto "${projectName}"? Esta acción no se puede deshacer.`)) {
-      deleteProject(projectId);
-      // Actualizamos la lista de proyectos en la pantalla
-      setProjects(listProjects());
+      await removeProject(projectId);
+      await refresh();
     }
   };
 
   return (
-    <section className="container mx-auto px-4 max-w-5xl space-y-6">
+    <section className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Proyectos</h1>
-        <Link href="/proyecto/nuevo" className="btn">Nuevo proyecto</Link>
+        <Link href="/proyecto/nuevo" className="btn btn-primary">Nuevo proyecto</Link>
       </div>
 
       {projects.length === 0 ? (
@@ -32,20 +40,19 @@ export default function ProyectosPage() {
             <div key={p.id} className="card p-4">
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-foreground/60">{p.client || "—"}</div>
-              <div className="mt-3 flex gap-2">
-                <Link className="btn" href={`/proyecto/${p.id}`}>Abrir</Link>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link className="btn btn-primary" href={`/proyecto/${p.id}`}>Abrir</Link>
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn btn-secondary"
                   onClick={() => setActiveProjectId(p.id)}
                   title="Marcar como activo"
                 >
                   Activar
                 </button>
-                {/* Botón de Eliminar */}
                 <button
                   type="button"
-                  className="btn-danger"
+                  className="btn btn-ghost"
                   onClick={() => handleDelete(p.id, p.name)}
                   title="Eliminar proyecto"
                 >

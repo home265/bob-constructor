@@ -47,7 +47,7 @@ function pickNumber(
     let ok = true;
     for (const k of p) {
       if (cur && typeof cur === "object" && k in cur) {
-        cur = cur[k as any];
+        cur = (cur as any)[k as any];
       } else {
         ok = false;
         break;
@@ -115,28 +115,37 @@ function RevestimientosCalculator() {
   const [junta, setJunta] = useState<number>(juntas[0] ?? 3); // mm
   const [waste, setWaste] = useState(10);
 
-  // Autocorrección ante cambios de JSON (mantenemos estilo actual)
-  if (tipos.length && !tipos.find((t) => t.key === tipo)) {
-    setTipo(tipos[0].key);
-  }
-  if (juntas.length && !juntas.includes(junta)) {
-    setJunta(juntas[0]);
-  }
+  // Autocorrección ante cambios de JSON (en efectos, no durante render)
+  useEffect(() => {
+    if (tipos.length && !tipos.find((t) => t.key === tipo)) {
+      setTipo(tipos[0].key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipos]);
 
-  // (C) precargar desde partida si viene deep-link
+  useEffect(() => {
+    if (juntas.length && !juntas.includes(junta)) {
+      setJunta(juntas[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [juntas]);
+
+  // (C) precargar desde partida si viene deep-link (async)
   useEffect(() => {
     if (!projectId || !partidaId) return;
-    const p = getPartida(projectId, partidaId);
-    if (p?.inputs) {
-      const inp = p.inputs as any;
-      if (typeof inp.tipo === "string") setTipo(inp.tipo);
-      if (typeof inp.L === "number") setLx(inp.L);
-      if (typeof inp.A === "number") setLy(inp.A);
-      if (typeof inp.lp === "number") setLp(inp.lp);
-      if (typeof inp.ap === "number") setAp(inp.ap);
-      if (typeof inp.junta === "number") setJunta(inp.junta);
-      if (typeof inp.waste === "number") setWaste(inp.waste);
-    }
+    (async () => {
+      const p = await getPartida(projectId, partidaId);
+      if (p?.inputs) {
+        const inp = p.inputs as any;
+        if (typeof inp.tipo === "string") setTipo(inp.tipo);
+        if (typeof inp.L === "number") setLx(inp.L);
+        if (typeof inp.A === "number") setLy(inp.A);
+        if (typeof inp.lp === "number") setLp(inp.lp);
+        if (typeof inp.ap === "number") setAp(inp.ap);
+        if (typeof inp.junta === "number") setJunta(inp.junta);
+        if (typeof inp.waste === "number") setWaste(inp.waste);
+      }
+    })();
   }, [projectId, partidaId]);
 
   // Cálculo (usa tu función real si existe; si no, eco del input)
@@ -154,11 +163,8 @@ function RevestimientosCalculator() {
   });
 
   // --------- (B) Materiales completos (pastina + adhesivo) ----------
-  const areaBase = (Lx || 0) * (Ly || 0);
-  const areaConDesperdicio =
-    typeof res?.piezas_con_desperdicio === "number"
-      ? res.piezas_con_desperdicio
-      : areaBase * (1 + (waste || 0) / 100);
+  const areaBase_m2 = (Lx || 0) * (Ly || 0);
+  const areaConDesperdicio_m2 = areaBase_m2 * (1 + (waste || 0) / 100);
 
   // Comienzo con lo que ya venga del cálculo
   const matAcum: Record<string, number> = {};
@@ -167,8 +173,7 @@ function RevestimientosCalculator() {
       matAcum[k] = Number(v) || 0;
     }
   }
-  // Si el cálculo ya trajo pastina_kg/adhesivo_kg los respetamos.
-  // Si NO, intentamos leer coeficientes razonables:
+
   const tipoKey = tipo; // usamos la key normalizada
 
   // Pastina (kg/m2)
@@ -176,8 +181,8 @@ function RevestimientosCalculator() {
     const pKg =
       pickNumber(pastina, [[tipoKey, "por_mm", junta], [tipoKey, "kg_por_m2"], ["por_mm", junta], ["kg_por_m2"]]) ??
       pickNumber(coeffs, [[tipoKey, "pastina_kg_por_m2"], ["pastina_kg_por_m2"]]);
-    if (typeof pKg === "number" && areaConDesperdicio > 0) {
-      matAcum.pastina_kg = Math.round(pKg * areaConDesperdicio * 100) / 100;
+    if (typeof pKg === "number" && areaConDesperdicio_m2 > 0) {
+      matAcum.pastina_kg = Math.round(pKg * areaConDesperdicio_m2 * 100) / 100;
     }
   }
 
@@ -186,8 +191,8 @@ function RevestimientosCalculator() {
     const aKg =
       pickNumber(adhesivos, [[tipoKey, "kg_por_m2"], ["kg_por_m2"]]) ??
       pickNumber(coeffs, [[tipoKey, "adhesivo_kg_por_m2"], ["adhesivo_kg_por_m2"]]);
-    if (typeof aKg === "number" && areaConDesperdicio > 0) {
-      matAcum.adhesivo_kg = Math.round(aKg * areaConDesperdicio * 100) / 100;
+    if (typeof aKg === "number" && areaConDesperdicio_m2 > 0) {
+      matAcum.adhesivo_kg = Math.round(aKg * areaConDesperdicio_m2 * 100) / 100;
     }
   }
 
@@ -205,8 +210,6 @@ function RevestimientosCalculator() {
     if (res?.cajas != null)
       out.push({ label: "Cajas", qty: Math.round(res.cajas * 100) / 100, unit: "u" });
 
-    // Si el cálculo ya traía pastina/adhesivo, quedan cubiertos más abajo.
-    // Volcamos matAcum (pastina/adhesivo u otros)
     for (const [k, v] of Object.entries(matAcum)) {
       if (typeof v !== "number" || !Number.isFinite(v)) continue;
       out.push({
@@ -222,7 +225,6 @@ function RevestimientosCalculator() {
   const itemsForProject: MaterialRow[] = useMemo(() => {
     const list: MaterialRow[] = [];
 
-    // Piezas / Cajas si vienen
     if (typeof res?.cajas === "number") {
       list.push({
         key: "cajas",
@@ -239,7 +241,6 @@ function RevestimientosCalculator() {
       });
     }
 
-    // Pastina / Adhesivo (desglosado)
     if (typeof matAcum.pastina_kg === "number") {
       list.push({
         key: "pastina_kg",
@@ -257,7 +258,6 @@ function RevestimientosCalculator() {
       });
     }
 
-    // Normalizo units → Unit
     return list.map((m) => ({ ...m, unit: normalizeUnit(m.unit as unknown as string) }));
   }, [res?.cajas, res?.piezas_con_desperdicio, matAcum.pastina_kg, matAcum.adhesivo_kg]);
 
@@ -305,9 +305,9 @@ function RevestimientosCalculator() {
   };
 
   // ------------------- (C) Actualizar partida -------------------
-  const handleUpdatePartida = () => {
+  const handleUpdatePartida = async () => {
     if (!projectId || !partidaId) return;
-    updatePartida(projectId, partidaId, {
+    await updatePartida(projectId, partidaId, {
       title: defaultTitle,
       inputs: { tipo, L: Lx, A: Ly, lp, ap, junta, waste },
       outputs: res as any,
