@@ -10,6 +10,7 @@ import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type MeshRow = { id?: string; label?: string; kg_m2?: number };
 type ConcreteRow = {
@@ -358,50 +359,74 @@ function LosaPremoldeadaCalculator() {
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">
-              Luz L (m)
+              <span className="flex items-center">
+                Luz L (m)
+                <HelpPopover>Distancia libre entre los apoyos (vigas o muros) que deben cubrir las viguetas.</HelpPopover>
+              </span>
               <input type="number" value={L} onChange={(e) => setL(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
             <label className="text-sm">
-              Ancho W (m)
+              <span className="flex items-center">
+                Ancho W (m)
+                <HelpPopover>Ancho total del área que se va a cubrir con la losa.</HelpPopover>
+              </span>
               <input type="number" value={W} onChange={(e) => setW(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm">
-              Separación viguetas (cm)
+              <span className="flex items-center">
+                Separación viguetas (cm)
+                <HelpPopover>Distancia de centro a centro entre cada vigueta. Un valor estándar es 50 cm.</HelpPopover>
+              </span>
               <input type="number" value={s} onChange={(e) => setS(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
             <label className="text-sm">
-              Apoyo por extremo (cm)
+              <span className="flex items-center">
+                Apoyo por extremo (cm)
+                <HelpPopover>Longitud extra de la vigueta que descansa sobre el muro o viga en cada extremo. Un valor típico es 10 cm.</HelpPopover>
+              </span>
               <input type="number" value={apoyo} onChange={(e) => setApoyo(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm">
-              Largo bloque (m)
+              <span className="flex items-center">
+                Largo bloque (m)
+                <HelpPopover>Longitud de los bloques de relleno (ladrillo cerámico o telgopor/EPS) que van entre las viguetas.</HelpPopover>
+              </span>
               <input type="number" value={lBloque} onChange={(e) => setLBloque(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm">
-              Capa compresión (cm)
+              <span className="flex items-center">
+                Capa compresión (cm)
+                <HelpPopover>Espesor de la capa de hormigón que se vierte sobre las viguetas y bloques. Un valor típico es 5 cm.</HelpPopover>
+              </span>
               <input type="number" value={capa} onChange={(e) => setCapa(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>Porcentaje de material extra (hormigón, acero) para cubrir pérdidas por cortes y derrames. Un valor común es 8-10%.</HelpPopover>
+              </span>
               <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
           </div>
 
           {/* Malla en capa */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-2 pt-4 border-t border-border">
             <label className="text-sm col-span-2 inline-flex items-center gap-2">
               <input type="checkbox" checked={usaMalla} onChange={(e) => setUsaMalla(e.target.checked)} />
-              Incluir malla de reparto en la capa
+              <span className="flex items-center">
+                Incluir malla de reparto en la capa
+                <HelpPopover>Se recomienda siempre incluir una malla de acero en la capa de compresión para controlar la fisuración.</HelpPopover>
+              </span>
             </label>
 
             {usaMalla && (
               <>
                 <label className="text-sm col-span-2">
-                  Malla
+                  <span>Malla</span>
                   <select value={meshId} onChange={(e) => setMeshId(e.target.value)} className="w-full px-3 py-2">
                     {meshOpts.map((m, i) => (
                       <option key={`${m.key}-${i}`} value={m.key}>
@@ -412,16 +437,19 @@ function LosaPremoldeadaCalculator() {
                 </label>
                 <label className="text-sm col-span-2 inline-flex items-center gap-2">
                   <input type="checkbox" checked={meshDouble} onChange={(e) => setMeshDouble(e.target.checked)} />
-                  Doble capa
+                  <span>Doble capa</span>
                 </label>
               </>
             )}
           </div>
 
           {/* Clase de hormigón (para desglose de la capa) */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 pt-4 border-t border-border">
             <label className="text-sm col-span-2">
-              Clase de hormigón (capa)
+              <span className="flex items-center">
+                Clase de hormigón (capa)
+                <HelpPopover>Define la resistencia del hormigón para la capa de compresión. H-21 es una opción común.</HelpPopover>
+              </span>
               <select value={concreteId} onChange={(e) => setConcreteId(e.target.value)} className="w-full px-3 py-2">
                 {concreteOpts.map((c, i) => (
                   <option key={`${c.key}-${i}`} value={c.key}>
@@ -449,7 +477,16 @@ function LosaPremoldeadaCalculator() {
       ) : null}
 
       {/* Agregar al proyecto */}
-      <AddToProject kind="losa_premoldeada" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      <div className="card p-4 space-y-3">
+          <h3 className="font-semibold flex items-center">
+              Guardar en proyecto
+              <HelpPopover>
+                Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+              </HelpPopover>
+          </h3>
+          <AddToProject kind="losa_premoldeada" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      </div>
+
 
       {/* (A) Lote local */}
       {batch.length > 0 && (

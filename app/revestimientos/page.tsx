@@ -14,6 +14,7 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 // (C) deep-link edición
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type RevestOptionsFile = {
   tipos?: (string | { key?: string; label?: string })[];
@@ -325,7 +326,7 @@ function RevestimientosCalculator() {
         <div className="card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Tipo
+              <span>Tipo</span>
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
@@ -340,7 +341,7 @@ function RevestimientosCalculator() {
             </label>
 
             <label className="text-sm">
-              Largo (m)
+              <span>Largo (m)</span>
               <input
                 type="number"
                 value={Lx}
@@ -350,7 +351,7 @@ function RevestimientosCalculator() {
             </label>
 
             <label className="text-sm">
-              Ancho (m)
+              <span>Ancho (m)</span>
               <input
                 type="number"
                 value={Ly}
@@ -360,7 +361,7 @@ function RevestimientosCalculator() {
             </label>
 
             <label className="text-sm">
-              Largo pieza (cm)
+              <span>Largo pieza (cm)</span>
               <input
                 type="number"
                 value={lp}
@@ -370,7 +371,7 @@ function RevestimientosCalculator() {
             </label>
 
             <label className="text-sm">
-              Ancho pieza (cm)
+              <span>Ancho pieza (cm)</span>
               <input
                 type="number"
                 value={ap}
@@ -380,7 +381,7 @@ function RevestimientosCalculator() {
             </label>
 
             <label className="text-sm">
-              Junta (mm)
+              <span>Junta (mm)</span>
               <select
                 value={junta}
                 onChange={(e) => setJunta(+e.target.value)}
@@ -395,7 +396,12 @@ function RevestimientosCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>
+                  Agrega un porcentaje extra de material para cubrir cortes, roturas y ajustes. Para cerámicas y porcelanatos, un valor típico es entre 10% y 15%.
+                </HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -423,12 +429,21 @@ function RevestimientosCalculator() {
             </div>
           ) : null}
 
-          <AddToProject
-            kind="revestimiento"
-            defaultTitle={defaultTitle}
-            items={itemsForProject}
-            raw={res}
-          />
+          {/* --- AYUDA AÑADIDA AQUÍ --- */}
+          <div className="card p-4 space-y-3">
+            <h3 className="font-semibold flex items-center">
+                Guardar en proyecto
+                <HelpPopover>
+                  Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+                </HelpPopover>
+            </h3>
+            <AddToProject
+                kind="revestimiento"
+                defaultTitle={defaultTitle}
+                items={itemsForProject}
+                raw={res}
+            />
+          </div>
         </div>
       </div>
 

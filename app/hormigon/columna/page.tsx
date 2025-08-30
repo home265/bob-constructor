@@ -16,6 +16,7 @@ import { getPartida, updatePartida } from "@/lib/project/storage";
 
 // helpers etiquetas/unidades
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type ConcreteRow = {
   id?: string;
@@ -357,7 +358,10 @@ function ColumnaCalculator() {
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Clase de hormigón
+              <span className="flex items-center">
+                Clase de hormigón
+                <HelpPopover>Define la resistencia del hormigón. H-21 es común para viviendas, mientras que H-25 o H-30 se usan para mayores exigencias.</HelpPopover>
+              </span>
               <select
                 value={concreteId}
                 onChange={(e) => setConcreteId(e.target.value)}
@@ -372,7 +376,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm">
-              Altura H (m)
+              <span className="flex items-center">
+                Altura H (m)
+                <HelpPopover>Altura total de la columna, de piso a techo.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={H}
@@ -382,7 +389,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm">
-              Lado b (cm)
+              <span className="flex items-center">
+                Lado b (cm)
+                <HelpPopover>Ancho de la sección de la columna.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={b}
@@ -392,7 +402,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm">
-              Lado h (cm)
+              <span className="flex items-center">
+                Lado h (cm)
+                <HelpPopover>Profundidad de la sección de la columna.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={h}
@@ -402,7 +415,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm">
-              Recubrimiento (cm)
+              <span className="flex items-center">
+                Recubrimiento (cm)
+                <HelpPopover>Distancia entre el borde del hormigón y el estribo de acero. Protege el acero de la corrosión. Un valor típico es 2-3 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={cover}
@@ -412,7 +428,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>Porcentaje de hormigón extra para compensar pérdidas durante el llenado. Un valor común es 5-10%.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -423,9 +442,12 @@ function ColumnaCalculator() {
           </div>
 
           {/* Verticales */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
             <label className="text-sm">
-              Φ vertical (mm)
+              <span className="flex items-center">
+                Φ vertical (mm)
+                <HelpPopover>Diámetro de las barras de acero principales que recorren la columna verticalmente.</HelpPopover>
+              </span>
               <select
                 value={phiV}
                 onChange={(e) => setPhiV(+e.target.value)}
@@ -440,7 +462,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm">
-              Nº de barras
+              <span className="flex items-center">
+                Nº de barras
+                <HelpPopover>Cantidad total de barras de acero verticales.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={nV}
@@ -451,9 +476,12 @@ function ColumnaCalculator() {
           </div>
 
           {/* Estribos */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
             <label className="text-sm">
-              Φ estribo (mm)
+              <span className="flex items-center">
+                Φ estribo (mm)
+                <HelpPopover>Diámetro de las barras de acero que envuelven las barras verticales (los "anillos").</HelpPopover>
+              </span>
               <select
                 value={phiS}
                 onChange={(e) => setPhiS(+e.target.value)}
@@ -468,7 +496,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm">
-              Separación e (cm)
+              <span className="flex items-center">
+                Separación e (cm)
+                <HelpPopover>Distancia vertical entre cada estribo. Un valor común es 15 o 20 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={s}
@@ -478,7 +509,10 @@ function ColumnaCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Ganchos (cm)
+              <span className="flex items-center">
+                Ganchos (cm)
+                <HelpPopover>Longitud extra de acero en los extremos de cada estribo para asegurar el anclaje. Un valor típico es 10 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={hook}
@@ -509,12 +543,21 @@ function ColumnaCalculator() {
       ) : null}
 
       {/* Agregar al proyecto (unitario) */}
-      <AddToProject
-        kind="columna"
-        defaultTitle={defaultTitle}
-        items={itemsForProject}
-        raw={res}
-      />
+      <div className="card p-4 space-y-3">
+          <h3 className="font-semibold flex items-center">
+              Guardar en proyecto
+              <HelpPopover>
+                Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+              </HelpPopover>
+          </h3>
+          <AddToProject
+            kind="columna"
+            defaultTitle={defaultTitle}
+            items={itemsForProject}
+            raw={res}
+          />
+      </div>
+
 
       {/* (A) Lote local */}
       {batch.length > 0 && (

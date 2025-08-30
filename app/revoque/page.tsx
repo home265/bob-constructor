@@ -17,6 +17,7 @@ import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 // (C) edición / deep-link
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type RevoqueOptionsFile = {
   lados?: { id?: string; label?: string }[];
@@ -377,7 +378,7 @@ function RevoqueCalculator() {
         <div className="card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Lados a revocar
+              <span>Lados a revocar</span>
               <select
                 value={lado}
                 onChange={(e) => setLado(e.target.value as LadoKey)}
@@ -392,7 +393,7 @@ function RevoqueCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Terminación lado 1
+              <span>Terminación lado 1</span>
               <select
                 value={term1}
                 onChange={(e) => setTerm1(e.target.value)}
@@ -408,7 +409,7 @@ function RevoqueCalculator() {
 
             {lado === "ambos" && (
               <label className="text-sm col-span-2">
-                Terminación lado 2
+                <span>Terminación lado 2</span>
                 <select
                   value={term2}
                   onChange={(e) => setTerm2(e.target.value)}
@@ -424,7 +425,7 @@ function RevoqueCalculator() {
             )}
 
             <label className="text-sm">
-              Longitud (m)
+              <span>Longitud (m)</span>
               <input
                 type="number"
                 value={L}
@@ -434,7 +435,7 @@ function RevoqueCalculator() {
             </label>
 
             <label className="text-sm">
-              Altura (m)
+              <span>Altura (m)</span>
               <input
                 type="number"
                 value={H}
@@ -444,7 +445,7 @@ function RevoqueCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Espesor (cm)
+              <span>Espesor (cm)</span>
               <input
                 type="number"
                 value={e}
@@ -454,7 +455,12 @@ function RevoqueCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>
+                  Agrega un porcentaje extra de mortero para cubrir el material que cae o queda en las herramientas durante la aplicación. Un valor típico es entre 10% y 20%.
+                </HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -498,12 +504,21 @@ function RevoqueCalculator() {
             </div>
           ) : null}
 
-          <AddToProject
-            kind="revoque"
-            defaultTitle={defaultTitle}
-            items={itemsForProject}
-            raw={res}
-          />
+          {/* --- AYUDA AÑADIDA AQUÍ --- */}
+          <div className="card p-4 space-y-3">
+              <h3 className="font-semibold flex items-center">
+                  Guardar en proyecto
+                  <HelpPopover>
+                    Cada cálculo que realizas se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+                  </HelpPopover>
+              </h3>
+              <AddToProject
+                kind="revoque"
+                defaultTitle={defaultTitle}
+                items={itemsForProject}
+                raw={res}
+              />
+          </div>
         </div>
       </div>
 

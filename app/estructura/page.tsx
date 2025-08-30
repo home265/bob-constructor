@@ -7,6 +7,7 @@ import BatchList from "@/components/ui/BatchList";
 import type { MaterialRow } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type OpcionUso = { key: string; q_kN_m2: number; label: string };
 type OpcionTecho = { key: string; g_kN_m2: number; label: string };
@@ -199,7 +200,7 @@ function EstructuraCalculator() {
     alert("Partida actualizada.");
   };
 
-  return (
+ return (
     <section className="container mx-auto px-4 max-w-5xl space-y-6">
       <div className="card p-4 space-y-3">
         <h1 className="text-2xl font-semibold">Boceto estructural (orientativo)</h1>
@@ -213,19 +214,69 @@ function EstructuraCalculator() {
         <div className="card p-4 space-y-4">
           <h2 className="font-medium">Entradas</h2>
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">Lx (m)<input type="number" value={Lx} onChange={(e)=>setLx(+e.target.value||0)} className="w-full px-3 py-2"/></label>
-            <label className="text-sm">Ly (m)<input type="number" value={Ly} onChange={(e)=>setLy(+e.target.value||0)} className="w-full px-3 py-2"/></label>
-            <label className="text-sm">N° vanos X<input type="number" value={nx} min={1} onChange={(e)=>setNx(Math.max(1,+e.target.value||1))} className="w-full px-3 py-2"/></label>
-            <label className="text-sm">N° vanos Y<input type="number" value={ny} min={1} onChange={(e)=>setNy(Math.max(1,+e.target.value||1))} className="w-full px-3 py-2"/></label>
-            <label className="text-sm">Plantas<input type="number" value={plantas} min={0} onChange={(e)=>setPlantas(Math.max(0,+e.target.value||0))} className="w-full px-3 py-2"/></label>
-            <label className="text-sm">Uso
+            <label className="text-sm">
+              <span className="flex items-center">
+                Lx (m)
+                <HelpPopover>Dimensión total de la estructura en la dirección X (horizontal).</HelpPopover>
+              </span>
+              <input type="number" value={Lx} onChange={(e)=>setLx(+e.target.value||0)} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                Ly (m)
+                <HelpPopover>Dimensión total de la estructura en la dirección Y (vertical).</HelpPopover>
+              </span>
+              <input type="number" value={Ly} onChange={(e)=>setLy(+e.target.value||0)} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                N° vanos X
+                <HelpPopover>Número de divisiones o espacios entre columnas en la dirección X.</HelpPopover>
+              </span>
+              <input type="number" value={nx} min={1} onChange={(e)=>setNx(Math.max(1,+e.target.value||1))} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                N° vanos Y
+                <HelpPopover>Número de divisiones o espacios entre columnas en la dirección Y.</HelpPopover>
+              </span>
+              <input type="number" value={ny} min={1} onChange={(e)=>setNy(Math.max(1,+e.target.value||1))} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                Plantas
+                <HelpPopover>Número de pisos o niveles de la estructura (sin contar la planta baja).</HelpPopover>
+              </span>
+              <input type="number" value={plantas} min={0} onChange={(e)=>setPlantas(Math.max(0,+e.target.value||0))} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                Uso
+                <HelpPopover>Define la sobrecarga de uso según el destino del edificio (ej: una vivienda tiene menos carga que un local comercial).</HelpPopover>
+              </span>
               <select value={usoKey} onChange={(e)=>setUsoKey(e.target.value)} className="w-full px-3 py-2">
                 {USOS.map((u,i)=><option key={`${u.key}-${i}`} value={u.key}>{u.label}</option>)}
               </select>
             </label>
-            <label className="text-sm">Losa (espesor cm)<input type="number" value={espLosa_cm} min={5} onChange={(e)=>setEspLosa(+e.target.value||0)} className="w-full px-3 py-2"/></label>
-            <label className="text-sm">Acabados (kN/m²)<input type="number" value={gAcabados} min={0} step={0.1} onChange={(e)=>setGAcabados(+e.target.value||0)} className="w-full px-3 py-2"/></label>
-            <label className="text-sm col-span-2">Techo (carga extra)
+            <label className="text-sm">
+              <span className="flex items-center">
+                Losa (espesor cm)
+                <HelpPopover>Espesor de la losa de hormigón. Esto afecta el peso propio de la estructura.</HelpPopover>
+              </span>
+              <input type="number" value={espLosa_cm} min={5} onChange={(e)=>setEspLosa(+e.target.value||0)} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                Acabados (kN/m²)
+                <HelpPopover>Carga permanente adicional de elementos no estructurales como pisos, contrapisos, cielorrasos y muros divisorios.</HelpPopover>
+              </span>
+              <input type="number" value={gAcabados} min={0} step={0.1} onChange={(e)=>setGAcabados(+e.target.value||0)} className="w-full px-3 py-2"/>
+            </label>
+            <label className="text-sm col-span-2">
+              <span className="flex items-center">
+                Techo (carga extra)
+                <HelpPopover>Define si el último nivel tiene una carga adicional por el tipo de techo (ej: tejas sobre madera es más pesado que una simple losa).</HelpPopover>
+              </span>
               <select value={techoKey} onChange={(e)=>setTechoKey(e.target.value)} className="w-full px-3 py-2">
                 {TECHOS.map((t,i)=><option key={`${t.key}-${i}`} value={t.key}>{t.label}</option>)}
               </select>
@@ -332,12 +383,21 @@ function EstructuraCalculator() {
       </div>
 
       {/* Guardar como partida */}
-      <AddToProject
-        kind="boceto_estructural"
-        defaultTitle={defaultTitle}
-        items={itemsForProject}
-        raw={raw}
-      />
+      <div className="card p-4 space-y-3">
+        <h3 className="font-semibold flex items-center">
+            Guardar como partida
+            <HelpPopover>
+              Aunque este boceto no calcula materiales, puedes guardarlo en tu proyecto como una 'partida' para tener un registro de las cargas y esfuerzos estimados.
+            </HelpPopover>
+        </h3>
+        <AddToProject
+            kind="boceto_estructural"
+            defaultTitle={defaultTitle}
+            items={itemsForProject}
+            raw={raw}
+        />
+      </div>
+
 
       {/* Botón (A) para armar lote local rápido */}
       <div>

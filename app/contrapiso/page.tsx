@@ -13,6 +13,7 @@ import { toUnit } from "@/lib/project/helpers";
 // Deep-link edición
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 /* ----------------------------- Tipos de datos ----------------------------- */
 type CptoOptions = {
@@ -335,7 +336,7 @@ function ContrapisoCalculator() {
         <div className="card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Tipo
+              <span>Tipo</span>
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
@@ -350,7 +351,7 @@ function ContrapisoCalculator() {
             </label>
 
             <label className="text-sm">
-              Largo (m)
+              <span>Largo (m)</span>
               <input
                 type="number"
                 value={L}
@@ -360,7 +361,7 @@ function ContrapisoCalculator() {
             </label>
 
             <label className="text-sm">
-              Ancho (m)
+              <span>Ancho (m)</span>
               <input
                 type="number"
                 value={A}
@@ -370,7 +371,7 @@ function ContrapisoCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Espesor (cm)
+              <span>Espesor (cm)</span>
               <input
                 type="number"
                 value={H}
@@ -381,7 +382,7 @@ function ContrapisoCalculator() {
 
             {!!mallas.length && (
               <label className="text-sm col-span-2">
-                Malla SIMA
+                <span>Malla SIMA</span>
                 <select
                   value={malla}
                   onChange={(e) => setMalla(e.target.value)}
@@ -400,7 +401,12 @@ function ContrapisoCalculator() {
             )}
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>
+                  Este porcentaje agrega material extra para cubrir pérdidas por cortes, roturas o errores durante la obra. Un valor común es entre 5% y 15%.
+                </HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -420,6 +426,11 @@ function ContrapisoCalculator() {
             >
               {editIndex !== null ? "Guardar ítem del lote" : "Añadir contrapiso al lote"}
             </button>
+            {/* --- AYUDA AÑADIDA AQUÍ --- */}
+            <HelpPopover>
+              La función 'Lote' te permite calcular varios contrapisos (ej: uno para la cocina, otro para el baño) y luego guardarlos todos juntos en tu proyecto en un solo paso. Es ideal para cómputos rápidos de múltiples sectores.
+            </HelpPopover>
+            
             {editIndex !== null && (
               <button
                 type="button"
@@ -465,7 +476,7 @@ function ContrapisoCalculator() {
             items={batch.map((b) => ({
               kind: b.kind,
               title: b.title,
-              materials: b.materials, // MaterialRow[]
+              materials: b.materials,
               inputs: b.inputs,
               outputs: b.outputs,
             }))}
@@ -476,12 +487,21 @@ function ContrapisoCalculator() {
 
       {/* Guardar en Proyecto (unitario) */}
       {itemsForProject.length > 0 && (
-        <AddToProject
-          kind="contrapiso"
-          defaultTitle={defaultTitle}
-          items={itemsForProject}
-          raw={r as Record<string, unknown>}
-        />
+        // --- AYUDA AÑADIDA EN EL TÍTULO DE ESTA TARJETA ---
+        <div className="card p-4 space-y-3">
+          <h3 className="font-semibold flex items-center">
+            Guardar en proyecto
+            <HelpPopover>
+              Cada cálculo que realizas (un muro, un contrapiso, etc.) se guarda como una 'partida' dentro del proyecto que creaste al inicio. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo sobre la marcha.
+            </HelpPopover>
+          </h3>
+          <AddToProject
+            kind="contrapiso"
+            defaultTitle={defaultTitle}
+            items={itemsForProject}
+            raw={r as Record<string, unknown>}
+          />
+        </div>
       )}
     </section>
   );

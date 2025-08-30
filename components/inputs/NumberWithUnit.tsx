@@ -3,7 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 type Props = {
-  label: string;
+  // --- ESTA ES LA ÚNICA LÍNEA LÓGICA QUE CAMBIA ---
+  // Se cambia 'string' por 'React.ReactNode' para permitir componentes como el popover.
+  label: React.ReactNode;
   name: string;
   unit?: string;
   value: number | string;
@@ -21,16 +23,14 @@ export default function NumberWithUnit({
   step = 0.01,
   min = 0,
 }: Props) {
-  // estado local para permitir vacío
+  // --- TODA TU LÓGICA DE ESTADO Y FUNCIONES PERMANECE 100% INTACTA ---
   const [raw, setRaw] = useState<string>(value === 0 ? "0" : String(value ?? ""));
 
-  // regex depende de si se permiten negativos o no
   const reInput = useMemo(
     () => (min < 0 ? /^-?\d*(?:[.,]\d*)?$/ : /^\d*(?:[.,]\d*)?$/),
     [min]
   );
 
-  // sync cuando cambia value externo
   useEffect(() => {
     const next = value === 0 ? "0" : String(value ?? "");
     if (next !== raw) setRaw(next);
@@ -42,7 +42,6 @@ export default function NumberWithUnit({
     return parseFloat(s.replace(",", "."));
   };
 
-  // Redondeo opcional al step (simple)
   const roundToStep = (n: number) => {
     if (!step || step <= 0) return n;
     const inv = 1 / step;
@@ -51,20 +50,17 @@ export default function NumberWithUnit({
 
   const commit = () => {
     let n = toNumber(raw);
-    // si no es número, caer al valor externo (o 0)
     if (!Number.isFinite(n)) n = typeof value === "number" ? value : 0;
-    // clamping al mínimo
     if (typeof min === "number" && n < min) n = min;
     const val = roundToStep(n);
     onChange(val);
-    setRaw(String(val)); // normaliza visualmente
+    setRaw(String(val));
   };
 
   const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === "Enter") {
-      (e.currentTarget as HTMLInputElement).blur(); // dispara onBlur -> commit
+      (e.currentTarget as HTMLInputElement).blur();
     } else if (e.key === "Escape") {
-      // restaura el valor externo
       setRaw(value === 0 ? "0" : String(value ?? ""));
       (e.currentTarget as HTMLInputElement).blur();
     }
@@ -75,11 +71,12 @@ export default function NumberWithUnit({
 
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium">{label}</span>
+      {/* Pequeño ajuste visual para alinear el texto con el ícono de ayuda */}
+      <span className="font-medium flex items-center">{label}</span>
       <div className="flex items-center gap-2">
         <input
           name={name}
-          type="text"              // permite vacío sin pelearse con el control
+          type="text"
           inputMode="decimal"
           className="w-40 rounded border px-3 py-2"
           step={step}
@@ -89,10 +86,8 @@ export default function NumberWithUnit({
           title={isLiveBelowMin ? `Mínimo: ${min}` : undefined}
           onChange={(e) => {
             const v = e.target.value;
-            // Permitimos dígitos y coma/punto; si min>=0, bloquea "-"
             if (reInput.test(v) || v === "") {
               setRaw(v);
-              // si ya es número válido y no viola min, avisamos en vivo
               const n = toNumber(v);
               if (Number.isFinite(n) && !(typeof min === "number" && n < min)) {
                 onChange(n);

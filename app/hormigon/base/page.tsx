@@ -16,6 +16,7 @@ import { getPartida, updatePartida } from "@/lib/project/storage";
 
 // helpers
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 /* ----------------------------- Tipos auxiliares ---------------------------- */
 
@@ -426,7 +427,7 @@ function BaseCalculator() {
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Clase de hormigón
+              <span>Clase de hormigón</span>
               <select value={concreteId} onChange={(e) => setConcreteId(e.target.value)} className="w-full px-3 py-2">
                 {concreteOpts.map((c, i) => (
                   <option key={`${c.key}-${i}`} value={c.key}>{c.label}</option>
@@ -434,64 +435,89 @@ function BaseCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">Largo (m)
+            <label className="text-sm">
+              <span>Largo (m)</span>
               <input type="number" value={L} onChange={(e) => setL(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-            <label className="text-sm">Ancho (m)
+            <label className="text-sm">
+              <span>Ancho (m)</span>
               <input type="number" value={B} onChange={(e) => setB(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-            <label className="text-sm">Espesor (cm)
+            <label className="text-sm">
+              <span>Espesor (cm)</span>
               <input type="number" value={Hcm} onChange={(e) => setHcm(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-            <label className="text-sm">Recubrimiento (cm)
+            <label className="text-sm">
+              <span className="flex items-center">
+                Recubrimiento (cm)
+                <HelpPopover>
+                  Es la capa de hormigón que protege al acero de la corrosión. Es la distancia desde el borde exterior de la base hasta la armadura. Un valor típico para fundaciones es de 5 cm.
+                </HelpPopover>
+              </span>
               <input type="number" value={cover} onChange={(e) => setCover(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
-            <label className="text-sm col-span-2">Desperdicio (%)
+            <label className="text-sm col-span-2">
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>
+                  Agrega un volumen extra de hormigón para compensar el material que se pierde por derrames o queda en las herramientas. Un valor común es entre 5% y 10%.
+                </HelpPopover>
+              </span>
               <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
           </div>
 
           {/* Selector de modo */}
-          <div className="grid grid-cols-1 gap-2">
+          <div className="grid grid-cols-1 gap-2 pt-4 border-t border-border">
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" checked={useMesh} onChange={(e) => setUseMesh(e.target.checked)} />
-              Usar malla SIMA (en vez de barras)
+              <span className="flex items-center">
+                Usar malla SIMA (en vez de barras)
+                <HelpPopover>
+                  Activa esta opción para usar mallas de acero pre-soldadas, comunes en plateas y bases. Si la dejas desactivada, podrás definir el armado con barras de acero individuales.
+                </HelpPopover>
+              </span>
             </label>
           </div>
 
           {useMesh ? (
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm col-span-2">Malla SIMA
+              <label className="text-sm col-span-2">
+                <span>Malla SIMA</span>
                 <select value={meshId} onChange={(e) => setMeshId(e.target.value)} className="w-full px-3 py-2">
                   {meshOpts.map((m, i) => <option key={`${m.key}-${i}`} value={m.key}>{m.label}</option>)}
                 </select>
               </label>
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
                 <input type="checkbox" checked={meshDoubleLayer} onChange={(e) => setMeshDoubleLayer(e.target.checked)} />
-                Doble capa de malla
+                <span>Doble capa de malla</span>
               </label>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">Φ barras X (mm)
+              <label className="text-sm">
+                <span>Φ barras X (mm)</span>
                 <select value={phiX} onChange={(e) => setPhiX(+e.target.value)} className="w-full px-3 py-2">
                   {rebarOpts.map((r, i) => <option key={`rx-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>)}
                 </select>
               </label>
-              <label className="text-sm">Separación X (cm)
+              <label className="text-sm">
+                <span>Separación X (cm)</span>
                 <input type="number" value={sX} onChange={(e) => setSX(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
-              <label className="text-sm">Φ barras Y (mm)
+              <label className="text-sm">
+                <span>Φ barras Y (mm)</span>
                 <select value={phiY} onChange={(e) => setPhiY(+e.target.value)} className="w-full px-3 py-2">
                   {rebarOpts.map((r, i) => <option key={`ry-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>)}
                 </select>
               </label>
-              <label className="text-sm">Separación Y (cm)
+              <label className="text-sm">
+                <span>Separación Y (cm)</span>
                 <input type="number" value={sY} onChange={(e) => setSY(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
                 <input type="checkbox" checked={doubleLayer} onChange={(e) => setDoubleLayer(e.target.checked)} />
-                Doble capa de barras
+                <span>Doble capa de barras</span>
               </label>
             </div>
           )}
@@ -513,7 +539,16 @@ function BaseCalculator() {
       ) : null}
 
       {/* Guardar unitario */}
-      <AddToProject kind="base" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      <div className="card p-4 space-y-3">
+          <h3 className="font-semibold flex items-center">
+              Guardar en proyecto
+              <HelpPopover>
+                Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+              </HelpPopover>
+          </h3>
+          <AddToProject kind="base" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      </div>
+
 
       {/* Lote local */}
       {batch.length > 0 && (

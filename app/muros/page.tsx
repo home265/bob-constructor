@@ -29,6 +29,7 @@ import type {
   WallOptions,
   WallResult,
 } from "@/lib/types";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 const schema = z.object({
   tipoMuroId: z.enum(["simple", "doble"]),
@@ -468,7 +469,14 @@ function MurosCalculator() {
                 onChange={(v) => setValue("H", v)}
               />
               <NumberWithUnit
-                label="Superficie adicional (SA)"
+                label={
+                  <>
+                    Superficie adicional (SA)
+                    <HelpPopover>
+                      Usa este campo para sumar áreas irregulares (ej: un triángulo bajo una escalera) que no se pueden calcular con 'Largo × Alto'.
+                    </HelpPopover>
+                  </>
+                }
                 name="SA"
                 unit="m²"
                 value={watch("SA") ?? 0}
@@ -478,7 +486,12 @@ function MurosCalculator() {
 
             {/* Vanos */}
             <div className="space-y-2">
-              <div className="font-medium">Vanos a descontar</div>
+              <div className="font-medium">
+                Vanos a descontar
+                <HelpPopover>
+                  Aquí puedes restar el área de puertas y ventanas. Ingresa Largo (LV) y Alto (HV) para que la app lo calcule, o si ya tienes el área, ingrésala directamente en Superficie (SV).
+                </HelpPopover>
+              </div>
               <p className="text-xs text-foreground/60">
                 LV/HV en <b>m</b> · SV en <b>m²</b>
               </p>
@@ -489,7 +502,12 @@ function MurosCalculator() {
 
             {/* Desperdicio */}
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium">Desperdicio (%)</label>
+              <label className="text-sm font-medium">
+                Desperdicio (%)
+                <HelpPopover>
+                  Este porcentaje agrega material extra para cubrir cortes, roturas y errores durante la construcción. Un valor típico es entre 5% y 10%.
+                </HelpPopover>
+              </label>
               <input
                 type="range"
                 min={0}
@@ -685,14 +703,23 @@ function MurosCalculator() {
         </div>
       )}
 
+      {/* --- ESTE ES EL BLOQUE CORREGIDO --- */}
       {/* Guardar en Proyecto (unitario) */}
       {!editMode && res && (
-        <AddToProject
-          kind="muro"
-          defaultTitle={defaultTitle}
-          items={itemsForProject}
-          raw={res}
-        />
+        <div className="card p-4 space-y-3">
+            <h3 className="font-semibold flex items-center">
+                Guardar en proyecto
+                <HelpPopover>
+                  Cada cálculo que realizas se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+                </HelpPopover>
+            </h3>
+            <AddToProject
+              kind="muro"
+              defaultTitle={defaultTitle}
+              items={itemsForProject}
+              raw={res}
+            />
+        </div>
       )}
     </section>
   );

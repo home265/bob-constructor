@@ -10,6 +10,7 @@ import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type ConcreteRow = {
   id?: string;
@@ -338,7 +339,10 @@ function PiloteCalculator() {
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Clase de hormigón
+              <span className="flex items-center">
+                Clase de hormigón
+                <HelpPopover>Define la resistencia del hormigón. Para pilotes, se suelen utilizar resistencias como H-25 o H-30.</HelpPopover>
+              </span>
               <select
                 value={concreteId}
                 onChange={(e) => setConcreteId(e.target.value)}
@@ -353,7 +357,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm">
-              Largo L (m)
+              <span className="flex items-center">
+                Largo L (m)
+                <HelpPopover>Longitud total del pilote desde la cabeza hasta la punta.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={L}
@@ -363,7 +370,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm">
-              Diámetro d (cm)
+              <span className="flex items-center">
+                Diámetro d (cm)
+                <HelpPopover>Diámetro de la sección circular del pilote.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={d}
@@ -373,7 +383,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm">
-              Recubrimiento (cm)
+              <span className="flex items-center">
+                Recubrimiento (cm)
+                <HelpPopover>Capa de hormigón que protege el acero. Para fundaciones en contacto con el suelo, un valor típico es de 5 a 7.5 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={cover}
@@ -383,7 +396,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas durante la excavación y el hormigonado. Suele ser mayor que en otros elementos.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -394,9 +410,12 @@ function PiloteCalculator() {
           </div>
 
           {/* Longitudinales */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
             <label className="text-sm">
-              Φ longitudinal (mm)
+              <span className="flex items-center">
+                Φ longitudinal (mm)
+                <HelpPopover>Diámetro de las barras de acero principales que recorren el pilote verticalmente.</HelpPopover>
+              </span>
               <select
                 value={phiL}
                 onChange={(e) => setPhiL(+e.target.value)}
@@ -411,7 +430,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm">
-              Nº de barras
+              <span className="flex items-center">
+                Nº de barras
+                <HelpPopover>Cantidad total de barras de acero verticales, distribuidas circularmente.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={nL}
@@ -422,9 +444,12 @@ function PiloteCalculator() {
           </div>
 
           {/* Espiral */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
             <label className="text-sm">
-              Φ espiral (mm)
+              <span className="flex items-center">
+                Φ espiral (mm)
+                <HelpPopover>Diámetro de la barra de acero que forma la armadura helicoidal o espiral (zuncho).</HelpPopover>
+              </span>
               <select
                 value={phiS}
                 onChange={(e) => setPhiS(+e.target.value)}
@@ -439,7 +464,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm">
-              Paso (cm/vuelta)
+              <span className="flex items-center">
+                Paso (cm/vuelta)
+                <HelpPopover>Distancia vertical entre cada vuelta de la espiral de acero.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={pitch}
@@ -449,7 +477,10 @@ function PiloteCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Extra de longitud (m)
+              <span className="flex items-center">
+                Extra de longitud (m)
+                <HelpPopover>Longitud adicional de la barra espiral para anclajes y ganchos en los extremos.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={extra}
@@ -469,13 +500,21 @@ function PiloteCalculator() {
               Actualizar partida
             </button>
           ) : null}
-
-          <AddToProject
-            kind="pilote"
-            defaultTitle={defaultTitle}
-            items={itemsForProject}
-            raw={res}
-          />
+          
+          <div className="card p-4 space-y-3">
+              <h3 className="font-semibold flex items-center">
+                  Guardar en proyecto
+                  <HelpPopover>
+                    Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+                  </HelpPopover>
+              </h3>
+              <AddToProject
+                kind="pilote"
+                defaultTitle={defaultTitle}
+                items={itemsForProject}
+                raw={res}
+              />
+          </div>
         </div>
       </div>
 

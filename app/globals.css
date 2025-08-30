@@ -62,7 +62,11 @@ body{
   background: color-mix(in srgb, var(--color-accent) 35%, transparent);
   color: var(--foreground);
 }
-
+.header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
 /* Links */
 a{ color: var(--color-base); text-underline-offset: 2px; }
 a:hover{ opacity: .9; }

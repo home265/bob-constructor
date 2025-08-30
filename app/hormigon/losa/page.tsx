@@ -10,6 +10,7 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type ConcreteRow = {
   id?: string;
@@ -418,7 +419,10 @@ function LosaCalculator() {
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Clase de hormigón
+              <span className="flex items-center">
+                Clase de hormigón
+                <HelpPopover>Define la resistencia del hormigón. H-21 es una resistencia común para losas de viviendas.</HelpPopover>
+              </span>
               <select value={concreteId} onChange={(e) => setConcreteId(e.target.value)} className="w-full px-3 py-2">
                 {concreteOpts.map((c, i) => (
                   <option key={`${c.key}-${i}`} value={c.key}>
@@ -429,42 +433,63 @@ function LosaCalculator() {
             </label>
 
             <label className="text-sm">
-              Lx (m)
+              <span className="flex items-center">
+                Lx (m)
+                <HelpPopover>Dimensión de la losa en la dirección X (generalmente el lado más corto).</HelpPopover>
+              </span>
               <input type="number" value={Lx} onChange={(e) => setLx(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
             <label className="text-sm">
-              Ly (m)
+              <span className="flex items-center">
+                Ly (m)
+                <HelpPopover>Dimensión de la losa en la dirección Y (generalmente el lado más largo).</HelpPopover>
+              </span>
               <input type="number" value={Ly} onChange={(e) => setLy(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm">
-              Espesor (cm)
+              <span className="flex items-center">
+                Espesor (cm)
+                <HelpPopover>Altura o espesor total de la losa de hormigón. Un valor típico puede ser de 10 a 15 cm.</HelpPopover>
+              </span>
               <input type="number" value={H} onChange={(e) => setH(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm">
-              Recubrimiento (cm)
+              <span className="flex items-center">
+                Recubrimiento (cm)
+                <HelpPopover>Capa de hormigón que protege el acero. Es la distancia desde el borde de la losa hasta la armadura. Un valor común es 2-3 cm.</HelpPopover>
+              </span>
               <input type="number" value={cover} onChange={(e) => setCover(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas por derrames o cortes. Un valor típico es 5-10%.</HelpPopover>
+              </span>
               <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
             </label>
           </div>
 
           {/* Selector de modo */}
-          <div className="grid grid-cols-1 gap-2">
+          <div className="grid grid-cols-1 gap-2 pt-4 border-t border-border">
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" checked={useMesh} onChange={(e) => setUseMesh(e.target.checked)} />
-              Usar malla SIMA (en vez de barras)
+              <span className="flex items-center">
+                Usar malla SIMA (en vez de barras)
+                <HelpPopover>Activa esta opción para usar mallas de acero pre-soldadas. Si la dejas desactivada, podrás definir el armado con barras de acero individuales.</HelpPopover>
+              </span>
             </label>
           </div>
 
           {useMesh ? (
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm col-span-2">
-                Malla SIMA
+                <span className="flex items-center">
+                  Malla SIMA
+                  <HelpPopover>Selecciona el tipo de malla electrosoldada según el cálculo estructural.</HelpPopover>
+                </span>
                 <select value={meshId} onChange={(e) => setMeshId(e.target.value)} className="w-full px-3 py-2">
                   {meshOpts.map((m, i) => (
                     <option key={`${m.key}-${i}`} value={m.key}>
@@ -475,13 +500,19 @@ function LosaCalculator() {
               </label>
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
                 <input type="checkbox" checked={meshDoubleLayer} onChange={(e) => setMeshDoubleLayer(e.target.checked)} />
-                Doble capa de malla
+                <span className="flex items-center">
+                  Doble capa de malla
+                  <HelpPopover>Activa si el cálculo requiere una armadura superior e inferior con mallas.</HelpPopover>
+                </span>
               </label>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm">
-                Φ barras X (mm)
+                <span className="flex items-center">
+                  Φ barras X (mm)
+                  <HelpPopover>Diámetro de las barras de acero en la dirección X.</HelpPopover>
+                </span>
                 <select value={phiX} onChange={(e) => setPhiX(+e.target.value)} className="w-full px-3 py-2">
                   {rebarOpts.map((r, i) => (
                     <option key={`rx-${r.key}-${i}`} value={r.phi_mm}>
@@ -491,12 +522,18 @@ function LosaCalculator() {
                 </select>
               </label>
               <label className="text-sm">
-                Separación X (cm)
+                <span className="flex items-center">
+                  Separación X (cm)
+                  <HelpPopover>Distancia entre cada barra de acero en la dirección X.</HelpPopover>
+                </span>
                 <input type="number" value={sX} onChange={(e) => setSX(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
 
               <label className="text-sm">
-                Φ barras Y (mm)
+                <span className="flex items-center">
+                  Φ barras Y (mm)
+                  <HelpPopover>Diámetro de las barras de acero en la dirección Y.</HelpPopover>
+                </span>
                 <select value={phiY} onChange={(e) => setPhiY(+e.target.value)} className="w-full px-3 py-2">
                   {rebarOpts.map((r, i) => (
                     <option key={`ry-${r.key}-${i}`} value={r.phi_mm}>
@@ -506,13 +543,19 @@ function LosaCalculator() {
                 </select>
               </label>
               <label className="text-sm">
-                Separación Y (cm)
+                <span className="flex items-center">
+                  Separación Y (cm)
+                  <HelpPopover>Distancia entre cada barra de acero en la dirección Y.</HelpPopover>
+                </span>
                 <input type="number" value={sY} onChange={(e) => setSY(+e.target.value || 0)} className="w-full px-3 py-2" />
               </label>
 
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
                 <input type="checkbox" checked={doubleLayer} onChange={(e) => setDoubleLayer(e.target.checked)} />
-                Doble capa de barras
+                <span className="flex items-center">
+                  Doble capa de barras
+                  <HelpPopover>Activa si el cálculo requiere una armadura superior e inferior con barras (parrilla doble).</HelpPopover>
+                </span>
               </label>
             </div>
           )}
@@ -534,7 +577,16 @@ function LosaCalculator() {
       ) : null}
 
       {/* Agregar al proyecto (unitario) */}
-      <AddToProject kind="losa" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      <div className="card p-4 space-y-3">
+          <h3 className="font-semibold flex items-center">
+              Guardar en proyecto
+              <HelpPopover>
+                Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+              </HelpPopover>
+          </h3>
+        <AddToProject kind="losa" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      </div>
+
 
       {/* (A) Lote local */}
       {batch.length > 0 && (

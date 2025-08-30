@@ -11,6 +11,7 @@ import BatchList from "@/components/ui/BatchList";
 import type { MaterialRow } from "@/lib/project/types";
 import { toUnit } from "@/lib/project/helpers";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 /* ----------------------------- Tipos de datos ----------------------------- */
 type CarpetaOptionsFile = {
@@ -378,7 +379,7 @@ function CarpetaCalculator() {
         <div className="card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Tipo de carpeta
+              <span>Tipo de carpeta</span>
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
@@ -394,7 +395,7 @@ function CarpetaCalculator() {
 
             {!!hidros.length && (
               <label className="text-sm col-span-2">
-                Hidrófugo
+                <span>Hidrófugo</span>
                 <select
                   value={hidro}
                   onChange={(e) => setHidro(e.target.value)}
@@ -410,7 +411,7 @@ function CarpetaCalculator() {
             )}
 
             <label className="text-sm">
-              Largo (m)
+              <span>Largo (m)</span>
               <input
                 type="number"
                 value={L}
@@ -419,7 +420,7 @@ function CarpetaCalculator() {
               />
             </label>
             <label className="text-sm">
-              Ancho (m)
+              <span>Ancho (m)</span>
               <input
                 type="number"
                 value={A}
@@ -428,7 +429,7 @@ function CarpetaCalculator() {
               />
             </label>
             <label className="text-sm col-span-2">
-              Espesor (cm)
+              <span>Espesor (cm)</span>
               <input
                 type="number"
                 value={H}
@@ -437,7 +438,12 @@ function CarpetaCalculator() {
               />
             </label>
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>
+                  Este porcentaje agrega material extra para cubrir pérdidas por irregularidades en la superficie, derrames o errores. Un valor común es entre 10% y 15%.
+                </HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -457,6 +463,11 @@ function CarpetaCalculator() {
             >
               {editIndex !== null ? "Guardar ítem del lote" : "Añadir carpeta al lote"}
             </button>
+            {/* --- AYUDA AÑADIDA AQUÍ --- */}
+            <HelpPopover>
+              La función 'Lote' te permite calcular varias carpetas (ej: una para cada habitación) y luego guardarlas todas juntas en tu proyecto en un solo paso. Es ideal para cómputos rápidos de múltiples sectores.
+            </HelpPopover>
+            
             {editIndex !== null && (
               <button
                 type="button"
@@ -527,14 +538,23 @@ function CarpetaCalculator() {
         </div>
       )}
 
-      {/* Guardar en Proyecto (unidad) */}
+      {/* Guardar en Proyecto (unitario) */}
       {itemsForProject.length > 0 && (
-        <AddToProject
-          kind="carpeta"
-          defaultTitle={defaultTitle}
-          items={itemsForProject}
-          raw={r as Record<string, unknown>}
-        />
+        // --- AYUDA AÑADIDA EN EL TÍTULO DE ESTA TARJETA ---
+        <div className="card p-4 space-y-3">
+            <h3 className="font-semibold flex items-center">
+                Guardar en proyecto
+                <HelpPopover>
+                  Cada cálculo que realizas se guarda como una 'partida' dentro del proyecto que creaste al inicio. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo sobre la marcha.
+                </HelpPopover>
+            </h3>
+            <AddToProject
+              kind="carpeta"
+              defaultTitle={defaultTitle}
+              items={itemsForProject}
+              raw={r as Record<string, unknown>}
+            />
+        </div>
       )}
 
       {/* Actualizar partida (deep-link) */}

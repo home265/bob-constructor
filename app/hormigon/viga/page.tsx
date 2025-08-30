@@ -10,6 +10,7 @@ import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
+import HelpPopover from "@/components/ui/HelpPopover";
 
 type ConcreteRow = {
   id?: string;
@@ -362,7 +363,10 @@ function VigaCalculator() {
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm col-span-2">
-              Clase de hormigón
+              <span className="flex items-center">
+                Clase de hormigón
+                <HelpPopover>Define la resistencia del hormigón. H-21 es una resistencia común para vigas de viviendas.</HelpPopover>
+              </span>
               <select
                 value={concreteId}
                 onChange={(e) => setConcreteId(e.target.value)}
@@ -377,7 +381,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm">
-              Largo L (m)
+              <span className="flex items-center">
+                Largo L (m)
+                <HelpPopover>Longitud de la viga entre sus apoyos (columnas o muros).</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={L}
@@ -386,7 +393,10 @@ function VigaCalculator() {
               />
             </label>
             <label className="text-sm">
-              Ancho b (cm)
+              <span className="flex items-center">
+                Ancho b (cm)
+                <HelpPopover>Ancho de la sección transversal de la viga.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={b}
@@ -395,7 +405,10 @@ function VigaCalculator() {
               />
             </label>
             <label className="text-sm">
-              Alto h (cm)
+              <span className="flex items-center">
+                Alto h (cm)
+                <HelpPopover>Altura total de la sección transversal de la viga.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={h}
@@ -405,7 +418,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm">
-              Recubrimiento (cm)
+              <span className="flex items-center">
+                Recubrimiento (cm)
+                <HelpPopover>Capa de hormigón que protege al acero. Es la distancia desde el borde de la viga hasta el estribo. Un valor típico es 2-3 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={cover}
@@ -415,7 +431,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Desperdicio (%)
+              <span className="flex items-center">
+                Desperdicio (%)
+                <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas. Un valor común es 5-10%.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={waste}
@@ -426,9 +445,12 @@ function VigaCalculator() {
           </div>
 
           {/* Longitudinales */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
             <label className="text-sm">
-              Φ longitudinal (mm)
+              <span className="flex items-center">
+                Φ longitudinal (mm)
+                <HelpPopover>Diámetro de las barras de acero principales que recorren la viga a lo largo.</HelpPopover>
+              </span>
               <select
                 value={phiLong}
                 onChange={(e) => setPhiLong(+e.target.value)}
@@ -443,7 +465,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm">
-              Barras sup (uds)
+              <span className="flex items-center">
+                Barras sup (uds)
+                <HelpPopover>Cantidad de barras de acero en la parte superior de la viga.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={nSup}
@@ -453,7 +478,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm">
-              Barras inf (uds)
+              <span className="flex items-center">
+                Barras inf (uds)
+                <HelpPopover>Cantidad de barras de acero en la parte inferior de la viga.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={nInf}
@@ -463,7 +491,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm">
-              Barras extras (uds)
+              <span className="flex items-center">
+                Barras extras (uds)
+                <HelpPopover>Cantidad de barras adicionales (ej: perchas o refuerzos en el alma de la viga).</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={nExt}
@@ -474,9 +505,12 @@ function VigaCalculator() {
           </div>
 
           {/* Estribos */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
             <label className="text-sm">
-              Φ estribo (mm)
+              <span className="flex items-center">
+                Φ estribo (mm)
+                <HelpPopover>Diámetro de las barras de acero que envuelven las barras longitudinales (los "anillos").</HelpPopover>
+              </span>
               <select
                 value={phiSt}
                 onChange={(e) => setPhiSt(+e.target.value)}
@@ -491,7 +525,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm">
-              Separación e (cm)
+              <span className="flex items-center">
+                Separación e (cm)
+                <HelpPopover>Distancia a lo largo de la viga entre cada estribo. Un valor común es 15 o 20 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={s}
@@ -501,7 +538,10 @@ function VigaCalculator() {
             </label>
 
             <label className="text-sm col-span-2">
-              Ganchos (cm)
+              <span className="flex items-center">
+                Ganchos (cm)
+                <HelpPopover>Longitud extra de acero en los extremos de cada estribo para asegurar el anclaje. Un valor típico es 10 cm.</HelpPopover>
+              </span>
               <input
                 type="number"
                 value={hook}
@@ -528,7 +568,16 @@ function VigaCalculator() {
       ) : null}
 
       {/* Agregar al proyecto (unidad) */}
-      <AddToProject kind="viga" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      <div className="card p-4 space-y-3">
+          <h3 className="font-semibold flex items-center">
+              Guardar en proyecto
+              <HelpPopover>
+                Cada cálculo se guarda como una 'partida' dentro de tu proyecto. Usa esta sección para añadir el resultado actual a un proyecto existente o para crear uno nuevo.
+              </HelpPopover>
+          </h3>
+        <AddToProject kind="viga" defaultTitle={defaultTitle} items={itemsForProject} raw={res} />
+      </div>
+
 
       {/* (A) Lote local */}
       {batch.length > 0 && (
