@@ -57,6 +57,10 @@ export type BaseResult = {
   modo: "malla" | "barras" | "simple";
   concreteClassId?: string;
 
+  // Sugerencia de espesor (opcional)
+  espesor_sugerido_cm?: number;
+  regla_espesor?: string;
+
   // Malla
   malla_id?: string;
   malla_kg?: number;
@@ -72,9 +76,13 @@ function kgPorMetro(rebarTable: BaseInput["rebarTable"], phi_mm?: number): numbe
   return row?.kg_m;
 }
 
-function safeN(n: any, def = 0) {
-  const x = Number(n);
-  return isFinite(x) ? x : def;
+function safeN(n: unknown, def = 0): number {
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  if (typeof n === "string") {
+    const x = Number(n);
+    if (Number.isFinite(x)) return x;
+  }
+  return def;
 }
 
 export function calcBase(input: BaseInput): BaseResult {
@@ -95,6 +103,11 @@ export function calcBase(input: BaseInput): BaseResult {
   const fWaste = 1 + safeN(wastePct) / 100;
   const volW = vol * fWaste;
 
+  // Sugerencia de espesor (regla práctica tipo losa/platea)
+  const L_control_m = Math.max(safeN(L), safeN(B));
+  const espesor_sugerido_cm = Math.max(15, Math.round((L_control_m * 100) / 25)); // H ≥ max(15 cm, L/25)
+  const regla_espesor = "H ≥ max(15 cm, L/25)";
+
   // ---- Modo malla
   if (mallaId && meshTable[mallaId]?.kg_m2) {
     const kg_m2 = safeN(meshTable[mallaId].kg_m2, 0);
@@ -109,6 +122,8 @@ export function calcBase(input: BaseInput): BaseResult {
       volumen_con_desperdicio_m3: round2(volW),
       modo: "malla",
       concreteClassId,
+      espesor_sugerido_cm,
+      regla_espesor,
       malla_id: mallaId,
       malla_kg: round2(mallaKg),
     };
@@ -177,6 +192,8 @@ export function calcBase(input: BaseInput): BaseResult {
     volumen_con_desperdicio_m3: round2(volW),
     modo,
     concreteClassId,
+    espesor_sugerido_cm,
+    regla_espesor,
     barras: (detX || detY)
       ? {
           acero_kg: round2(kgTot),

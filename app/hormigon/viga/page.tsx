@@ -145,8 +145,9 @@ function VigaCalculator() {
   }, [projectId, partidaId]);
 
   // Cálculo (con fallback resistente)
-  const calc = (C as any).calcViga ?? (C as any).default ?? ((x: any) => x);
-  const res = calc({
+  // Cálculo tipado
+const res: C.VigaResult = C.calcViga({
+
     L_m: L,
     b_cm: b,
     h_cm: h,
@@ -160,7 +161,8 @@ function VigaCalculator() {
 
   // (B) Desglose opcional de hormigón según JSON
   const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3 ?? 0;
-  const concRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concRow: ConcreteRow | undefined = concrete ? concrete[concreteId] : undefined;
+
   const concBreakdown: Record<string, number> = {};
   if (vol > 0 && concRow) {
     const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -181,16 +183,26 @@ function VigaCalculator() {
   // Salida (tabla)
   const rows: ResultRow[] = [];
   rows.push({
-    label: "Sección",
-    qty: (`${b}×${h}` as any),
-    unit: "cm",
-  });
+  label: "Sección b×h",
+  qty: b,
+  unit: "cm",
+  hint: `b=${b} cm · h=${h} cm`,
+});
+
   if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: round2(res.area_seccion_m2), unit: "m²" });
   if (res?.dimensiones?.L_m != null) rows.push({ label: "Largo", qty: round2(res.dimensiones.L_m), unit: "m" });
 
   if (vol > 0) rows.push({ label: "Hormigón", qty: round2(vol), unit: "m³", hint: "Con desperdicio" });
 
   if (typeof res?.acero_total_kg === "number") rows.push({ label: "Acero total", qty: round2(res.acero_total_kg), unit: "kg" });
+  if (res?.sugerencias?.as_min_cm2 !== undefined) {
+  rows.push({
+    label: "As,min (longitudinal)",
+    qty: res.sugerencias.as_min_cm2,
+    unit: "cm²",
+    hint: res.sugerencias.regla_as_min,
+  });
+}
 
   if (res?.longitudinal) {
     const Lg = res.longitudinal;
@@ -256,23 +268,26 @@ function VigaCalculator() {
         key: k,
         label: keyToLabel(k),
         qty: round2(Number(v) || 0),
-        unit: normalizeUnit(keyToUnit(k) as any),
+        unit: normalizeUnit(keyToUnit(k)),
+
       });
     }
 
     return out;
-  }, [vol, res?.longitudinal?.kg, res?.escribos?.kg, res?.acero_total_kg, concreteId, JSON.stringify(concBreakdown)]);
+  }, [vol, res?.longitudinal?.kg, res?.estribos?.kg, res?.acero_total_kg, concreteId, JSON.stringify(concBreakdown)]
+);
 
   const defaultTitle = `Viga ${b}×${h} · L=${L} m`;
 
   // (A) Lote local
-  type BatchItem = {
-    kind: "viga";
-    title: string;
-    materials: MaterialRow[];
-    inputs: VigaInputs | any;
-    outputs: Record<string, any>;
-  };
+ type BatchItem = {
+  kind: "viga";
+  title: string;
+  materials: MaterialRow[];
+  inputs: VigaInputs;
+  outputs: C.VigaResult;
+};
+
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
@@ -292,7 +307,8 @@ function VigaCalculator() {
       title: defaultTitle,
       materials: itemsForProject,
       inputs,
-      outputs: res as any,
+      outputs: res,
+
     };
     setBatch((prev) => {
       if (editIndex !== null) {
@@ -349,7 +365,8 @@ function VigaCalculator() {
         long: { phi_mm: phiLong, n_sup: nSup, n_inf: nInf, n_extra: nExt },
         stirrups: { phi_mm: phiSt, spacing_cm: s, hook_cm: hook },
       } satisfies VigaInputs,
-      outputs: res as any,
+      outputs: res,
+
       materials: itemsForProject,
     });
     alert("Partida actualizada.");
@@ -417,6 +434,35 @@ function VigaCalculator() {
                 value={h}
                 onChange={setH}
             />
+               {/* Sugeridos de dimensión */}
+{res?.sugerencias && (
+  <div className="col-span-2 text-xs mt-1">
+    Sugerido — h: <b>{res.sugerencias.h_sugerido_cm} cm</b>, b: <b>{res.sugerencias.b_sugerido_cm} cm</b>
+    <HelpPopover>{res.sugerencias.regla_dimensiones}</HelpPopover>
+  </div>
+)}
+{res?.sugerencias && h < res.sugerencias.h_sugerido_cm && (
+  <div
+    role="alert"
+    aria-live="polite"
+    className="col-span-2 mt-1 rounded-md border px-3 py-2 text-sm
+               bg-amber-100 text-amber-900 border-amber-300
+               dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700"
+  >
+    El alto ingresado ({h} cm) es menor al recomendado ({res.sugerencias.h_sugerido_cm} cm).
+  </div>
+)}
+{res?.sugerencias && b < res.sugerencias.b_sugerido_cm && (
+  <div
+    role="alert"
+    aria-live="polite"
+    className="col-span-2 mt-1 rounded-md border px-3 py-2 text-sm
+               bg-amber-100 text-amber-900 border-amber-300
+               dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700"
+  >
+    El ancho ingresado ({b} cm) es menor al recomendado ({res.sugerencias.b_sugerido_cm} cm).
+  </div>
+)}
 
             <NumberWithUnit
                 label={
@@ -562,8 +608,22 @@ function VigaCalculator() {
 
         {/* Resultado */}
         <div className="card p-4 card--table">
-          <ResultTable title="Resultado" items={rows} />
-        </div>
+  <ResultTable title="Resultado" items={rows} />
+
+  {res?.sugerencias?.combos_longitudinal?.length ? (
+    <div className="mt-3 text-sm">
+      <div className="font-medium mb-1">Combos sugeridos de barras (ejemplos)</div>
+      <ul className="list-disc pl-5 space-y-1">
+        {res.sugerencias.combos_longitudinal.map((c, i) => (
+          <li key={`combo-${i}`}>
+            {c.cantidad}×Φ{c.phi_mm} → As ≈ {c.As_cm2} cm²
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : null}
+</div>
+
       </div>
 
       {/* Deep-link: actualizar partida */}

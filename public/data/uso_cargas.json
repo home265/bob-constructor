@@ -1,0 +1,6 @@
+[
+  { "key": "vivienda", "label": "Vivienda", "gk_kN_m2": 1.5, "qk_kN_m2": 2.0 },
+  { "key": "terraza", "label": "Terraza accesible", "gk_kN_m2": 1.5, "qk_kN_m2": 3.0 },
+  { "key": "comercial", "label": "Comercial liviano", "gk_kN_m2": 1.5, "qk_kN_m2": 3.0 },
+  { "key": "cochera", "label": "Cochera", "gk_kN_m2": 2.0, "qk_kN_m2": 2.5 }
+]

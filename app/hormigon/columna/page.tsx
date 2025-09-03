@@ -4,6 +4,7 @@ import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/columna";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
 import AddToProject from "@/components/ui/AddToProject";
+import type { ColumnaResult } from "@/lib/calc/columna";
 
 // (A) lote local
 import AddToProjectBatch from "@/components/ui/AddToProjectBatch";
@@ -148,25 +149,25 @@ function ColumnaCalculator() {
   }, [rebarOpts]);
 
   // Cálculo (con fallback por si exportás default en la lib)
-  const calc =
-    (C as any).calcColumna ??
-    (C as any).default ??
-    ((x: any) => x);
-  const res = calc({
-    H_m: H,
-    b_cm: b,
-    h_cm: h,
-    cover_cm: cover,
-    concreteClassId: concreteId,
-    wastePct: waste,
-    rebarTable: rebarMap,
-    vertical: { phi_mm: phiV, n: nV },
-    stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
-  });
+  // Cálculo (tipado, sin any)
+const res: ColumnaResult = C.calcColumna({
+  H_m: H,
+  b_cm: b,
+  h_cm: h,
+  cover_cm: cover,
+  concreteClassId: concreteId,
+  wastePct: waste,
+  rebarTable: rebarMap,
+  vertical: { phi_mm: phiV, n: nV },
+  stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
+});
+
 
   // (B) Desglose de hormigón a partir de concrete_classes.json
   const vol = (res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3) || 0;
-  const concreteRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concreteMap = concrete as Record<string, ConcreteRow> | undefined;
+const concreteRow: ConcreteRow | undefined = concreteMap ? concreteMap[concreteId] : undefined;
+
   const matBreakdown: Record<string, number> = {};
   if (vol > 0 && concreteRow) {
     const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -189,7 +190,9 @@ function ColumnaCalculator() {
 
   // Salida a tabla
   const rows: ResultRow[] = [];
-  rows.push({ label: "Sección", qty: `${b}×${h}`, unit: "cm" as any });
+  rows.push({ label: "Lado b", qty: b, unit: "cm" });
+rows.push({ label: "Lado h", qty: h, unit: "cm" });
+
   if (res?.dimensiones?.H_m != null) rows.push({ label: "Altura", qty: res.dimensiones.H_m, unit: "m" });
   if (res?.area_seccion_m2 != null) rows.push({ label: "Área sección", qty: res.area_seccion_m2, unit: "m²" });
 
@@ -254,7 +257,8 @@ function ColumnaCalculator() {
         key: k,
         label: keyToLabel(k),
         qty: Math.round((Number(v) || 0) * 100) / 100,
-        unit: normalizeUnit(keyToUnit(k) as any),
+        unit: normalizeUnit(keyToUnit(k)),
+
       });
     }
     return out;
@@ -264,12 +268,13 @@ function ColumnaCalculator() {
 
   // (A) Lote local
   type BatchItem = {
-    kind: "columna";
-    title: string;
-    materials: MaterialRow[];
-    inputs: ColumnaInputs;
-    outputs: Record<string, any>;
-  };
+  kind: "columna";
+  title: string;
+  materials: MaterialRow[];
+  inputs: ColumnaInputs;
+  outputs: ColumnaResult;
+};
+
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
@@ -285,12 +290,13 @@ function ColumnaCalculator() {
       stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
     };
     const item: BatchItem = {
-      kind: "columna",
-      title: defaultTitle,
-      materials: itemsForProject,
-      inputs,
-      outputs: res as any,
-    };
+  kind: "columna",
+  title: defaultTitle,
+  materials: itemsForProject,
+  inputs,
+  outputs: res,
+};
+
     setBatch((prev) => {
       if (editIndex !== null) {
         const next = [...prev];
@@ -344,7 +350,7 @@ function ColumnaCalculator() {
         vertical: { phi_mm: phiV, n: nV },
         stirrups: { phi_mm: phiS, spacing_cm: s, hook_cm: hook },
       } satisfies ColumnaInputs,
-      outputs: res as any,
+      outputs: res,
       materials: itemsForProject,
     });
     alert("Partida actualizada.");

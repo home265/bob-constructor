@@ -1,0 +1,5 @@
+{
+  "interior": { "losa": 20, "viga": 25, "columna": 25, "base": 40 },
+  "exterior": { "losa": 25, "viga": 30, "columna": 30, "base": 50 },
+  "suelo":    { "losa": 30, "viga": 35, "columna": 40, "base": 60 }
+}

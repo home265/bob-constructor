@@ -169,11 +169,9 @@ function LosaCalculator() {
   }, [meshOpts]);
 
   // Cálculo con fallback si la lib exporta default
-  const calc =
-    (C as any).calcLosa ??
-    (C as any).default ??
-    ((x: any) => x);
-  const res = calc({
+  // Cálculo tipado (sin any)
+const res: C.LosaResult = C.calcLosa({
+
     Lx_m: Lx,
     Ly_m: Ly,
     H_cm: H,
@@ -197,7 +195,8 @@ function LosaCalculator() {
 
   // (B) Desglose hormigón según concrete_classes.json
   const vol = (res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3) || 0;
-  const concreteRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concreteRow: ConcreteRow | undefined = concrete ? concrete[concreteId] : undefined;
+
   const matBreakdown: Record<string, number> = {};
   if (vol > 0 && concreteRow) {
     const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -217,6 +216,15 @@ function LosaCalculator() {
   const rows: ResultRow[] = [];
   rows.push({ label: "Área", qty: res?.area_m2 ?? 0, unit: "m²" });
   rows.push({ label: "Espesor", qty: res?.espesor_cm ?? 0, unit: "cm" });
+  if (res?.espesor_sugerido_cm !== undefined) {
+  rows.push({
+    label: "Espesor sugerido",
+    qty: res.espesor_sugerido_cm,
+    unit: "cm",
+    hint: res.regla_espesor ?? "H ≥ max(10 cm, L/25)",
+  });
+}
+
   if (vol > 0) rows.push({ label: "Hormigón", qty: Math.round(vol * 100) / 100, unit: "m³", hint: "Con desperdicio" });
 
   if (res?.modo === "malla" && res?.malla_kg != null) {
@@ -293,7 +301,8 @@ function LosaCalculator() {
         key: k,
         label: keyToLabel(k),
         qty: Math.round((Number(v) || 0) * 100) / 100,
-        unit: normalizeUnit(keyToUnit(k) as any),
+        unit: normalizeUnit(keyToUnit(k)),
+
       });
     }
     return out;
@@ -303,12 +312,13 @@ function LosaCalculator() {
 
   // (A) Lote local
   type BatchItem = {
-    kind: "losa";
-    title: string;
-    materials: MaterialRow[];
-    inputs: LosaInputs;
-    outputs: Record<string, any>;
-  };
+  kind: "losa";
+  title: string;
+  materials: MaterialRow[];
+  inputs: LosaInputs;
+  outputs: C.LosaResult;
+};
+
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
@@ -337,7 +347,8 @@ function LosaCalculator() {
       title: defaultTitle,
       materials: itemsForProject,
       inputs,
-      outputs: res as any,
+      outputs: res,
+
     };
     setBatch((prev) => {
       if (editIndex !== null) {
@@ -405,7 +416,8 @@ function LosaCalculator() {
               doubleLayer,
             },
       } satisfies LosaInputs,
-      outputs: res as any,
+      outputs: res,
+
       materials: itemsForProject,
     });
     alert("Partida actualizada.");
@@ -470,6 +482,24 @@ function LosaCalculator() {
               value={H}
               onChange={setH}
             />
+             {res?.espesor_sugerido_cm !== undefined && (
+  <div className="col-span-2 text-xs mt-1">
+    Sugerido: <b>{res.espesor_sugerido_cm} cm</b>{" "}
+    <HelpPopover>Regla práctica: {res.regla_espesor ?? "H ≥ max(10 cm, L/25)"}.</HelpPopover>
+  </div>
+)}
+{res?.espesor_sugerido_cm !== undefined && H < res.espesor_sugerido_cm && (
+  <div
+    role="alert"
+    aria-live="polite"
+    className="col-span-2 mt-1 rounded-md border px-3 py-2 text-sm
+               bg-amber-100 text-amber-900 border-amber-300
+               dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700"
+  >
+    El espesor ingresado ({H} cm) es menor al recomendado ({res.espesor_sugerido_cm} cm).
+  </div>
+)}
+
 
             <NumberWithUnit
               label={

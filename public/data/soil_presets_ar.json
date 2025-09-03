@@ -1,0 +1,5 @@
+{
+  "malo": { "sigma_adm_kPa": 100 },
+  "medio": { "sigma_adm_kPa": 200 },
+  "bueno": { "sigma_adm_kPa": 300 }
+}

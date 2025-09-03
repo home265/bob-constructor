@@ -33,6 +33,8 @@ export type LosaResult = {
   espesor_cm: number;
   volumen_m3: number;
   volumen_con_desperdicio_m3: number;
+  espesor_sugerido_cm?: number;
+  regla_espesor?: string;
 
   modo: "malla" | "barras" | "simple";
   concreteClassId?: string;
@@ -53,10 +55,15 @@ export type LosaResult = {
 // 👉 Alias interno para evitar indexar un tipo opcional
 type BarDet = NonNullable<LosaResult["barras"]>["x"];
 
-function safeN(n: any, def = 0) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : def;
+function safeN(n: unknown, def = 0): number {
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  if (typeof n === "string") {
+    const x = Number(n);
+    if (Number.isFinite(x)) return x;
+  }
+  return def;
 }
+
 function kgPorMetro(map: LosaInput["rebarTable"], phi_mm?: number) {
   if (!map || !phi_mm) return undefined;
   const key = String(phi_mm);
@@ -84,7 +91,10 @@ export function calcLosa(input: LosaInput): LosaResult {
   const vol = area * (H / 100);
   const fWaste = 1 + Math.max(0, safeN(wastePct)) / 100;
   const volW = vol * fWaste;
-
+  // Regla simple de pre-dimensionado: H ≥ max(10 cm, L/25)
+  const L_control_m = Math.max(Lx, Ly);
+  const espesor_sugerido_cm = Math.max(10, Math.round((L_control_m * 100) / 25));
+  const regla_espesor = "H ≥ max(10 cm, L/25)";
   // --- Malla
   if (mallaId && meshTable[mallaId]?.kg_m2) {
     const kg_m2 = safeN(meshTable[mallaId].kg_m2, 0);
@@ -100,6 +110,8 @@ export function calcLosa(input: LosaInput): LosaResult {
       concreteClassId,
       malla_id: mallaId,
       malla_kg: round2(mallaKg),
+      espesor_sugerido_cm,
+      regla_espesor,
     };
   }
 
@@ -167,6 +179,8 @@ export function calcLosa(input: LosaInput): LosaResult {
     volumen_con_desperdicio_m3: round2(volW),
     modo,
     concreteClassId,
+    espesor_sugerido_cm,
+    regla_espesor,
     barras: {
       acero_kg: round2(kgTot),
       capas,

@@ -62,12 +62,26 @@ export type VigaResult = {
     kg_m?: number;
     kg: number;
   };
+
+  // --- Sugerencias (opcionales, no rompen compatibilidad)
+  sugerencias?: {
+    h_sugerido_cm: number;
+    b_sugerido_cm: number;
+    regla_dimensiones: string;
+    as_min_cm2: number;
+    regla_as_min: string;
+    combos_longitudinal: Array<{ phi_mm: number; cantidad: number; As_cm2: number }>;
+  };
 };
 
 // --- Helpers internos
-function safeN(n: any, def = 0) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : def;
+function safeN(n: unknown, def = 0): number {
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  if (typeof n === "string") {
+    const x = Number(n);
+    if (Number.isFinite(x)) return x;
+  }
+  return def;
 }
 
 function kgPorMetro(map: VigaInput["rebarTable"], phi_mm?: number) {
@@ -75,6 +89,34 @@ function kgPorMetro(map: VigaInput["rebarTable"], phi_mm?: number) {
   const key = String(phi_mm);
   const row = map[key] || map[`${phi_mm}`];
   return row?.kg_m;
+}
+
+function barAreaCm2(diam_mm: number): number {
+  // área = π·d²/4  (mm² → cm²)
+  return (Math.PI * (diam_mm ** 2) / 4) / 100;
+}
+
+function chooseCombosForAs(
+  AsObjetivo_cm2: number,
+  diametersAvailable: number[],
+  maxCombos = 3
+): Array<{ phi_mm: number; cantidad: number; As_cm2: number }> {
+  const cantidades = [2, 3, 4, 5, 6, 8];
+  const combos: Array<{ phi_mm: number; cantidad: number; As_cm2: number }> = [];
+
+  diametersAvailable.forEach((d) => {
+    const a = barAreaCm2(d);
+    cantidades.forEach((n) => {
+      const As = +(a * n).toFixed(2);
+      if (As >= AsObjetivo_cm2) combos.push({ phi_mm: d, cantidad: n, As_cm2: As });
+    });
+  });
+
+  combos.sort(
+    (c1, c2) =>
+      Math.abs(c1.As_cm2 - AsObjetivo_cm2) - Math.abs(c2.As_cm2 - AsObjetivo_cm2)
+  );
+  return combos.slice(0, maxCombos);
 }
 
 // --- Cálculo
@@ -101,6 +143,20 @@ export function calcViga(input: VigaInput): VigaResult {
   const area = b_m * h_m;          // m²
   const vol = area * L;            // m³
   const volW = vol * fWaste;
+
+  // --- Sugerencias de pre-dimensionado
+  const h_sugerido_cm = Math.max(20, Math.round((L * 100) / 12)); // h≈L/12, mín. 20 cm
+  const b_sugerido_cm = Math.max(15, Math.round(h_sugerido_cm / 2)); // b≈h/2, mín. 15 cm
+  const as_min_pct = 0.002; // 0,20%
+  const as_min_cm2 = round2(Math.max(0, b_cm * h_cm * as_min_pct));
+
+  // Diámetros disponibles según tabla
+  const diamAvail = Object.keys(rebarTable ?? {})
+    .map((k) => Number(k))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+
+  const combosSug = chooseCombosForAs(as_min_cm2, diamAvail);
 
   // Longitudinales
   const phiL = safeN(long?.phi_mm) || 0;
@@ -165,6 +221,14 @@ export function calcViga(input: VigaInput): VigaResult {
     acero_total_kg: aceroTot,
     longitudinal: longDet,
     estribos: stDet,
+    sugerencias: {
+      h_sugerido_cm,
+      b_sugerido_cm,
+      regla_dimensiones: "h≈L/12; b≈h/2 (≥15 cm)",
+      as_min_cm2,
+      regla_as_min: "As,min ≈ 0,20% · b · h",
+      combos_longitudinal: combosSug,
+    },
   };
 }
 

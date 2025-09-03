@@ -59,9 +59,13 @@ export type ColumnaResult = {
   };
 };
 
-function safeN(n: any, def = 0) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : def;
+function safeN(n: unknown, def = 0) {
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  if (typeof n === "string") {
+    const x = Number(n);
+    if (Number.isFinite(x)) return x;
+  }
+  return def;
 }
 
 function kgPorMetro(map: ColumnaInput["rebarTable"], phi_mm?: number) {

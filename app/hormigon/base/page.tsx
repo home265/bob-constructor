@@ -196,7 +196,8 @@ function BaseCalculator() {
   }, [meshOpts]);
 
   // Cálculo (memoizado)
-  const res = useMemo(() => C.calcBase({
+  const res: C.BaseResult = useMemo(() => C.calcBase({
+
     L, B, Hcm,
     concreteClassId: concreteId,
     wastePct: waste,
@@ -223,7 +224,8 @@ function BaseCalculator() {
     [res?.volumen_con_desperdicio_m3, res?.volumen_m3]
   );
 
-  const concreteRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concreteRow: ConcreteRow | undefined = concrete ? concrete[concreteId] : undefined;
+
 
   const matBreakdown = useMemo<Record<string, number>>(() => {
     const out: Record<string, number> = {};
@@ -254,6 +256,15 @@ function BaseCalculator() {
     const r: ResultRow[] = [];
     if (res?.area_m2 != null)     r.push({ label: "Área",     qty: res.area_m2,   unit: "m²" });
     if (res?.espesor_cm != null)  r.push({ label: "Espesor",  qty: res.espesor_cm, unit: "cm" });
+    if (res?.espesor_sugerido_cm !== undefined) {
+  r.push({
+    label: "Espesor sugerido",
+    qty: res.espesor_sugerido_cm,
+    unit: "cm",
+    hint: res.regla_espesor ?? "H ≥ max(15 cm, L/25)",
+  });
+}
+
     if (vol > 0)                  r.push({ label: "Hormigón", qty: Math.round(vol * 100) / 100, unit: "m³", hint: "Con desperdicio" });
 
     if (res?.modo === "malla" && res?.malla_kg != null) {
@@ -457,6 +468,26 @@ function BaseCalculator() {
                 value={Hcm}
                 onChange={setHcm}
             />
+            {/* Sugerencia de espesor */}
+{res?.espesor_sugerido_cm !== undefined && (
+  <div className="col-span-2 text-xs mt-1">
+    Sugerido: <b>{res.espesor_sugerido_cm} cm</b>{" "}
+    <HelpPopover>{res.regla_espesor ?? "H ≥ max(15 cm, L/25)"}.</HelpPopover>
+  </div>
+)}
+{res?.espesor_sugerido_cm !== undefined && Hcm < res.espesor_sugerido_cm && (
+  <div
+    role="alert"
+    aria-live="polite"
+    className="col-span-2 mt-1 rounded-md border px-3 py-2 text-sm
+               bg-amber-100 text-amber-900 border-amber-300
+               dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700"
+  >
+    El espesor ingresado ({Hcm} cm) es menor al recomendado ({res.espesor_sugerido_cm} cm).
+  </div>
+)}
+
+
             <NumberWithUnit
                 label={
                     <span className="flex items-center">

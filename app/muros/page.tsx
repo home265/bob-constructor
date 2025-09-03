@@ -117,9 +117,8 @@ function MurosCalculator() {
       if (o.morteros_asiento_ids?.length) {
         setValue("morteroAsientoId", String(o.morteros_asiento_ids[0]));
       }
-      if (o.juntas_mm?.length) {
-        setValue("juntaMm", Number(o.juntas_mm[0]));
-      }
+      setValue("juntaMm", 10);
+
     })();
   }, [setValue]);
 
@@ -432,11 +431,12 @@ function MurosCalculator() {
                   className="rounded border px-3 py-2"
                   {...register("juntaMm", { valueAsNumber: true })}
                 >
-                  {opts.juntas_mm.map((j) => (
-                    <option key={j} value={j}>
-                      {j} mm
-                    </option>
-                  ))}
+                  {[10, 15, 20, 25, 30].map((j) => (
+  <option key={j} value={j}>
+    {j} mm
+  </option>
+))}
+
                 </select>
               </label>
 
