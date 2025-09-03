@@ -17,6 +17,7 @@ import { getPartida, updatePartida } from "@/lib/project/storage";
 // helpers etiquetas/unidades
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type ConcreteRow = {
   id?: string;
@@ -375,70 +376,72 @@ function ColumnaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Altura H (m)
-                <HelpPopover>Altura total de la columna, de piso a techo.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={H}
-                onChange={(e) => setH(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Altura H (m)
+                  <HelpPopover>Altura total de la columna, de piso a techo.</HelpPopover>
+                </span>
+              }
+              name="altura"
+              unit="m"
+              value={H}
+              onChange={setH}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Lado b (cm)
-                <HelpPopover>Ancho de la sección de la columna.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={b}
-                onChange={(e) => setB(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Lado b (cm)
+                  <HelpPopover>Ancho de la sección de la columna.</HelpPopover>
+                </span>
+              }
+              name="lado_b"
+              unit="cm"
+              value={b}
+              onChange={setB}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Lado h (cm)
-                <HelpPopover>Profundidad de la sección de la columna.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={h}
-                onChange={(e) => setHsec(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Lado h (cm)
+                  <HelpPopover>Profundidad de la sección de la columna.</HelpPopover>
+                </span>
+              }
+              name="lado_h"
+              unit="cm"
+              value={h}
+              onChange={setHsec}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Recubrimiento (cm)
-                <HelpPopover>Distancia entre el borde del hormigón y el estribo de acero. Protege el acero de la corrosión. Un valor típico es 2-3 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={cover}
-                onChange={(e) => setCover(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Recubrimiento (cm)
+                  <HelpPopover>Distancia entre el borde del hormigón y el estribo de acero. Protege el acero de la corrosión. Un valor típico es 2-3 cm.</HelpPopover>
+                </span>
+              }
+              name="recubrimiento"
+              unit="cm"
+              value={cover}
+              onChange={setCover}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>Porcentaje de hormigón extra para compensar pérdidas durante el llenado. Un valor común es 5-10%.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>Porcentaje de hormigón extra para compensar pérdidas durante el llenado. Un valor común es 5-10%.</HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
 
           {/* Verticales */}
@@ -461,18 +464,18 @@ function ColumnaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Nº de barras
-                <HelpPopover>Cantidad total de barras de acero verticales.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={nV}
-                onChange={(e) => setNV(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Nº de barras
+                  <HelpPopover>Cantidad total de barras de acero verticales.</HelpPopover>
+                </span>
+              }
+              name="n_barras"
+              value={nV}
+              onChange={(v) => setNV(Math.round(v))}
+              step={1}
+            />
           </div>
 
           {/* Estribos */}
@@ -495,31 +498,33 @@ function ColumnaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Separación e (cm)
-                <HelpPopover>Distancia vertical entre cada estribo. Un valor común es 15 o 20 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={s}
-                onChange={(e) => setS(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Separación e (cm)
+                  <HelpPopover>Distancia vertical entre cada estribo. Un valor común es 15 o 20 cm.</HelpPopover>
+                </span>
+              }
+              name="separacion"
+              unit="cm"
+              value={s}
+              onChange={setS}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Ganchos (cm)
-                <HelpPopover>Longitud extra de acero en los extremos de cada estribo para asegurar el anclaje. Un valor típico es 10 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <div className="col-span-2">
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Ganchos (cm)
+                    <HelpPopover>Longitud extra de acero en los extremos de cada estribo para asegurar el anclaje. Un valor típico es 10 cm.</HelpPopover>
+                  </span>
+                }
+                name="ganchos"
+                unit="cm"
                 value={hook}
-                onChange={(e) => setHook(+e.target.value || 0)}
-                className="w-full px-3 py-2"
+                onChange={setHook}
               />
-            </label>
+            </div>
           </div>
         </div>
 

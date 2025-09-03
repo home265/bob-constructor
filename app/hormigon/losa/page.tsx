@@ -11,6 +11,7 @@ import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type ConcreteRow = {
   id?: string;
@@ -432,44 +433,71 @@ function LosaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Lx (m)
-                <HelpPopover>Dimensión de la losa en la dirección X (generalmente el lado más corto).</HelpPopover>
-              </span>
-              <input type="number" value={Lx} onChange={(e) => setLx(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Ly (m)
-                <HelpPopover>Dimensión de la losa en la dirección Y (generalmente el lado más largo).</HelpPopover>
-              </span>
-              <input type="number" value={Ly} onChange={(e) => setLy(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Lx (m)
+                  <HelpPopover>Dimensión de la losa en la dirección X (generalmente el lado más corto).</HelpPopover>
+                </span>
+              }
+              name="lx"
+              unit="m"
+              value={Lx}
+              onChange={setLx}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Ly (m)
+                  <HelpPopover>Dimensión de la losa en la dirección Y (generalmente el lado más largo).</HelpPopover>
+                </span>
+              }
+              name="ly"
+              unit="m"
+              value={Ly}
+              onChange={setLy}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Espesor (cm)
-                <HelpPopover>Altura o espesor total de la losa de hormigón. Un valor típico puede ser de 10 a 15 cm.</HelpPopover>
-              </span>
-              <input type="number" value={H} onChange={(e) => setH(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Espesor (cm)
+                  <HelpPopover>Altura o espesor total de la losa de hormigón. Un valor típico puede ser de 10 a 15 cm.</HelpPopover>
+                </span>
+              }
+              name="espesor"
+              unit="cm"
+              value={H}
+              onChange={setH}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Recubrimiento (cm)
-                <HelpPopover>Capa de hormigón que protege el acero. Es la distancia desde el borde de la losa hasta la armadura. Un valor común es 2-3 cm.</HelpPopover>
-              </span>
-              <input type="number" value={cover} onChange={(e) => setCover(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Recubrimiento (cm)
+                  <HelpPopover>Capa de hormigón que protege el acero. Es la distancia desde el borde de la losa hasta la armadura. Un valor común es 2-3 cm.</HelpPopover>
+                </span>
+              }
+              name="recubrimiento"
+              unit="cm"
+              value={cover}
+              onChange={setCover}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas por derrames o cortes. Un valor típico es 5-10%.</HelpPopover>
-              </span>
-              <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
+            <div className="col-span-2">
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Desperdicio (%)
+                    <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas por derrames o cortes. Un valor típico es 5-10%.</HelpPopover>
+                  </span>
+                }
+                name="desperdicio"
+                unit="%"
+                value={waste}
+                onChange={setWaste}
+              />
+            </div>
           </div>
 
           {/* Selector de modo */}
@@ -521,13 +549,18 @@ function LosaCalculator() {
                   ))}
                 </select>
               </label>
-              <label className="text-sm">
-                <span className="flex items-center">
-                  Separación X (cm)
-                  <HelpPopover>Distancia entre cada barra de acero en la dirección X.</HelpPopover>
-                </span>
-                <input type="number" value={sX} onChange={(e) => setSX(+e.target.value || 0)} className="w-full px-3 py-2" />
-              </label>
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Separación X (cm)
+                    <HelpPopover>Distancia entre cada barra de acero en la dirección X.</HelpPopover>
+                  </span>
+                }
+                name="separacion_x"
+                unit="cm"
+                value={sX}
+                onChange={setSX}
+              />
 
               <label className="text-sm">
                 <span className="flex items-center">
@@ -542,13 +575,18 @@ function LosaCalculator() {
                   ))}
                 </select>
               </label>
-              <label className="text-sm">
-                <span className="flex items-center">
-                  Separación Y (cm)
-                  <HelpPopover>Distancia entre cada barra de acero en la dirección Y.</HelpPopover>
-                </span>
-                <input type="number" value={sY} onChange={(e) => setSY(+e.target.value || 0)} className="w-full px-3 py-2" />
-              </label>
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Separación Y (cm)
+                    <HelpPopover>Distancia entre cada barra de acero en la dirección Y.</HelpPopover>
+                  </span>
+                }
+                name="separacion_y"
+                unit="cm"
+                value={sY}
+                onChange={setSY}
+              />
 
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
                 <input type="checkbox" checked={doubleLayer} onChange={(e) => setDoubleLayer(e.target.checked)} />

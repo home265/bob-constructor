@@ -11,6 +11,7 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type ConcreteRow = {
   id?: string;
@@ -356,57 +357,59 @@ function PiloteCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Largo L (m)
-                <HelpPopover>Longitud total del pilote desde la cabeza hasta la punta.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={L}
-                onChange={(e) => setL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Largo L (m)
+                  <HelpPopover>Longitud total del pilote desde la cabeza hasta la punta.</HelpPopover>
+                </span>
+              }
+              name="largo"
+              unit="m"
+              value={L}
+              onChange={setL}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Diámetro d (cm)
-                <HelpPopover>Diámetro de la sección circular del pilote.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={d}
-                onChange={(e) => setD(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Diámetro d (cm)
+                  <HelpPopover>Diámetro de la sección circular del pilote.</HelpPopover>
+                </span>
+              }
+              name="diametro"
+              unit="cm"
+              value={d}
+              onChange={setD}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Recubrimiento (cm)
-                <HelpPopover>Capa de hormigón que protege el acero. Para fundaciones en contacto con el suelo, un valor típico es de 5 a 7.5 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={cover}
-                onChange={(e) => setCover(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Recubrimiento (cm)
+                  <HelpPopover>Capa de hormigón que protege el acero. Para fundaciones en contacto con el suelo, un valor típico es de 5 a 7.5 cm.</HelpPopover>
+                </span>
+              }
+              name="recubrimiento"
+              unit="cm"
+              value={cover}
+              onChange={setCover}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas durante la excavación y el hormigonado. Suele ser mayor que en otros elementos.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas durante la excavación y el hormigonado. Suele ser mayor que en otros elementos.</HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
 
           {/* Longitudinales */}
@@ -429,18 +432,18 @@ function PiloteCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Nº de barras
-                <HelpPopover>Cantidad total de barras de acero verticales, distribuidas circularmente.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={nL}
-                onChange={(e) => setNL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Nº de barras
+                  <HelpPopover>Cantidad total de barras de acero verticales, distribuidas circularmente.</HelpPopover>
+                </span>
+              }
+              name="n_barras"
+              value={nL}
+              onChange={(v) => setNL(Math.round(v))}
+              step={1}
+            />
           </div>
 
           {/* Espiral */}
@@ -463,31 +466,33 @@ function PiloteCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Paso (cm/vuelta)
-                <HelpPopover>Distancia vertical entre cada vuelta de la espiral de acero.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={pitch}
-                onChange={(e) => setPitch(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Paso (cm/vuelta)
+                  <HelpPopover>Distancia vertical entre cada vuelta de la espiral de acero.</HelpPopover>
+                </span>
+              }
+              name="paso"
+              unit="cm"
+              value={pitch}
+              onChange={setPitch}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Extra de longitud (m)
-                <HelpPopover>Longitud adicional de la barra espiral para anclajes y ganchos en los extremos.</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <div className="col-span-2">
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Extra de longitud (m)
+                    <HelpPopover>Longitud adicional de la barra espiral para anclajes y ganchos en los extremos.</HelpPopover>
+                  </span>
+                }
+                name="extra_longitud"
+                unit="m"
                 value={extra}
-                onChange={(e) => setExtra(+e.target.value || 0)}
-                className="w-full px-3 py-2"
+                onChange={setExtra}
               />
-            </label>
+            </div>
           </div>
         </div>
 

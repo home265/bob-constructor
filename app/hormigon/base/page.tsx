@@ -17,6 +17,7 @@ import { getPartida, updatePartida } from "@/lib/project/storage";
 // helpers
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 /* ----------------------------- Tipos auxiliares ---------------------------- */
 
@@ -435,36 +436,57 @@ function BaseCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span>Largo (m)</span>
-              <input type="number" value={L} onChange={(e) => setL(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span>Ancho (m)</span>
-              <input type="number" value={B} onChange={(e) => setB(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span>Espesor (cm)</span>
-              <input type="number" value={Hcm} onChange={(e) => setHcm(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Recubrimiento (cm)
-                <HelpPopover>
-                  Es la capa de hormigón que protege al acero de la corrosión. Es la distancia desde el borde exterior de la base hasta la armadura. Un valor típico para fundaciones es de 5 cm.
-                </HelpPopover>
-              </span>
-              <input type="number" value={cover} onChange={(e) => setCover(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>
-                  Agrega un volumen extra de hormigón para compensar el material que se pierde por derrames o queda en las herramientas. Un valor común es entre 5% y 10%.
-                </HelpPopover>
-              </span>
-              <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
+            <NumberWithUnit
+                label="Largo (m)"
+                name="largo"
+                unit="m"
+                value={L}
+                onChange={setL}
+            />
+            <NumberWithUnit
+                label="Ancho (m)"
+                name="ancho"
+                unit="m"
+                value={B}
+                onChange={setB}
+            />
+            <NumberWithUnit
+                label="Espesor (cm)"
+                name="espesor"
+                unit="cm"
+                value={Hcm}
+                onChange={setHcm}
+            />
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Recubrimiento (cm)
+                        <HelpPopover>
+                        Es la capa de hormigón que protege al acero de la corrosión. Es la distancia desde el borde exterior de la base hasta la armadura. Un valor típico para fundaciones es de 5 cm.
+                        </HelpPopover>
+                    </span>
+                }
+                name="recubrimiento"
+                unit="cm"
+                value={cover}
+                onChange={setCover}
+            />
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>
+                            Agrega un volumen extra de hormigón para compensar el material que se pierde por derrames o queda en las herramientas. Un valor común es entre 5% y 10%.
+                            </HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
 
           {/* Selector de modo */}
@@ -501,20 +523,26 @@ function BaseCalculator() {
                   {rebarOpts.map((r, i) => <option key={`rx-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>)}
                 </select>
               </label>
-              <label className="text-sm">
-                <span>Separación X (cm)</span>
-                <input type="number" value={sX} onChange={(e) => setSX(+e.target.value || 0)} className="w-full px-3 py-2" />
-              </label>
+              <NumberWithUnit
+                label="Separación X (cm)"
+                name="separacion_x"
+                unit="cm"
+                value={sX}
+                onChange={setSX}
+              />
               <label className="text-sm">
                 <span>Φ barras Y (mm)</span>
                 <select value={phiY} onChange={(e) => setPhiY(+e.target.value)} className="w-full px-3 py-2">
                   {rebarOpts.map((r, i) => <option key={`ry-${r.key}-${i}`} value={r.phi_mm}>{r.label}</option>)}
                 </select>
               </label>
-              <label className="text-sm">
-                <span>Separación Y (cm)</span>
-                <input type="number" value={sY} onChange={(e) => setSY(+e.target.value || 0)} className="w-full px-3 py-2" />
-              </label>
+              <NumberWithUnit
+                label="Separación Y (cm)"
+                name="separacion_y"
+                unit="cm"
+                value={sY}
+                onChange={setSY}
+              />
               <label className="text-sm col-span-2 inline-flex items-center gap-2">
                 <input type="checkbox" checked={doubleLayer} onChange={(e) => setDoubleLayer(e.target.checked)} />
                 <span>Doble capa de barras</span>

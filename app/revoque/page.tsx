@@ -18,6 +18,7 @@ import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type RevoqueOptionsFile = {
   lados?: { id?: string; label?: string }[];
@@ -424,50 +425,48 @@ function RevoqueCalculator() {
               </label>
             )}
 
-            <label className="text-sm">
-              <span>Longitud (m)</span>
-              <input
-                type="number"
-                value={L}
-                onChange={(e) => setL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Longitud (m)"
+              name="longitud"
+              unit="m"
+              value={L}
+              onChange={setL}
+            />
 
-            <label className="text-sm">
-              <span>Altura (m)</span>
-              <input
-                type="number"
-                value={H}
-                onChange={(e) => setH(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Altura (m)"
+              name="altura"
+              unit="m"
+              value={H}
+              onChange={setH}
+            />
+            
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label="Espesor (cm)"
+                    name="espesor"
+                    unit="cm"
+                    value={e}
+                    onChange={setE}
+                />
+            </div>
 
-            <label className="text-sm col-span-2">
-              <span>Espesor (cm)</span>
-              <input
-                type="number"
-                value={e}
-                onChange={(e2) => setE(+e2.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
-
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>
-                  Agrega un porcentaje extra de mortero para cubrir el material que cae o queda en las herramientas durante la aplicación. Un valor típico es entre 10% y 20%.
-                </HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={waste}
-                onChange={(e2) => setWaste(+e2.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>
+                            Agrega un porcentaje extra de mortero para cubrir el material que cae o queda en las herramientas durante la aplicación. Un valor típico es entre 10% y 20%.
+                            </HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
         </div>
 

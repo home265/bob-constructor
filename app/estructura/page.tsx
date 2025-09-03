@@ -8,6 +8,7 @@ import type { MaterialRow } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type OpcionUso = { key: string; q_kN_m2: number; label: string };
 type OpcionTecho = { key: string; g_kN_m2: number; label: string };
@@ -214,41 +215,69 @@ function EstructuraCalculator() {
         <div className="card p-4 space-y-4">
           <h2 className="font-medium">Entradas</h2>
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">
-              <span className="flex items-center">
-                Lx (m)
-                <HelpPopover>Dimensión total de la estructura en la dirección X (horizontal).</HelpPopover>
-              </span>
-              <input type="number" value={Lx} onChange={(e)=>setLx(+e.target.value||0)} className="w-full px-3 py-2"/>
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Ly (m)
-                <HelpPopover>Dimensión total de la estructura en la dirección Y (vertical).</HelpPopover>
-              </span>
-              <input type="number" value={Ly} onChange={(e)=>setLy(+e.target.value||0)} className="w-full px-3 py-2"/>
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                N° vanos X
-                <HelpPopover>Número de divisiones o espacios entre columnas en la dirección X.</HelpPopover>
-              </span>
-              <input type="number" value={nx} min={1} onChange={(e)=>setNx(Math.max(1,+e.target.value||1))} className="w-full px-3 py-2"/>
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                N° vanos Y
-                <HelpPopover>Número de divisiones o espacios entre columnas en la dirección Y.</HelpPopover>
-              </span>
-              <input type="number" value={ny} min={1} onChange={(e)=>setNy(Math.max(1,+e.target.value||1))} className="w-full px-3 py-2"/>
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Plantas
-                <HelpPopover>Número de pisos o niveles de la estructura (sin contar la planta baja).</HelpPopover>
-              </span>
-              <input type="number" value={plantas} min={0} onChange={(e)=>setPlantas(Math.max(0,+e.target.value||0))} className="w-full px-3 py-2"/>
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Lx (m)
+                  <HelpPopover>Dimensión total de la estructura en la dirección X (horizontal).</HelpPopover>
+                </span>
+              }
+              name="lx"
+              unit="m"
+              value={Lx}
+              onChange={setLx}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Ly (m)
+                  <HelpPopover>Dimensión total de la estructura en la dirección Y (vertical).</HelpPopover>
+                </span>
+              }
+              name="ly"
+              unit="m"
+              value={Ly}
+              onChange={setLy}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  N° vanos X
+                  <HelpPopover>Número de divisiones o espacios entre columnas en la dirección X.</HelpPopover>
+                </span>
+              }
+              name="nx"
+              value={nx}
+              onChange={(v) => setNx(Math.max(1, Math.round(v)))}
+              min={1}
+              step={1}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  N° vanos Y
+                  <HelpPopover>Número de divisiones o espacios entre columnas en la dirección Y.</HelpPopover>
+                </span>
+              }
+              name="ny"
+              value={ny}
+              onChange={(v) => setNy(Math.max(1, Math.round(v)))}
+              min={1}
+              step={1}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Plantas
+                  <HelpPopover>Número de pisos o niveles de la estructura (sin contar la planta baja).</HelpPopover>
+                </span>
+              }
+              name="plantas"
+              value={plantas}
+              onChange={(v) => setPlantas(Math.max(0, Math.round(v)))}
+              min={0}
+              step={1}
+            />
             <label className="text-sm">
               <span className="flex items-center">
                 Uso
@@ -258,20 +287,33 @@ function EstructuraCalculator() {
                 {USOS.map((u,i)=><option key={`${u.key}-${i}`} value={u.key}>{u.label}</option>)}
               </select>
             </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Losa (espesor cm)
-                <HelpPopover>Espesor de la losa de hormigón. Esto afecta el peso propio de la estructura.</HelpPopover>
-              </span>
-              <input type="number" value={espLosa_cm} min={5} onChange={(e)=>setEspLosa(+e.target.value||0)} className="w-full px-3 py-2"/>
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Acabados (kN/m²)
-                <HelpPopover>Carga permanente adicional de elementos no estructurales como pisos, contrapisos, cielorrasos y muros divisorios.</HelpPopover>
-              </span>
-              <input type="number" value={gAcabados} min={0} step={0.1} onChange={(e)=>setGAcabados(+e.target.value||0)} className="w-full px-3 py-2"/>
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Losa (espesor cm)
+                  <HelpPopover>Espesor de la losa de hormigón. Esto afecta el peso propio de la estructura.</HelpPopover>
+                </span>
+              }
+              name="espLosa"
+              unit="cm"
+              value={espLosa_cm}
+              onChange={setEspLosa}
+              min={5}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Acabados (kN/m²)
+                  <HelpPopover>Carga permanente adicional de elementos no estructurales como pisos, contrapisos, cielorrasos y muros divisorios.</HelpPopover>
+                </span>
+              }
+              name="gAcabados"
+              unit="kN/m²"
+              value={gAcabados}
+              onChange={setGAcabados}
+              min={0}
+              step={0.1}
+            />
             <label className="text-sm col-span-2">
               <span className="flex items-center">
                 Techo (carga extra)

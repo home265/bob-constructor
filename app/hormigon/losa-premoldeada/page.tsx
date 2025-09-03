@@ -11,6 +11,7 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type MeshRow = { id?: string; label?: string; kg_m2?: number };
 type ConcreteRow = {
@@ -358,59 +359,92 @@ function LosaPremoldeadaCalculator() {
         {/* Formulario */}
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">
-              <span className="flex items-center">
-                Luz L (m)
-                <HelpPopover>Distancia libre entre los apoyos (vigas o muros) que deben cubrir las viguetas.</HelpPopover>
-              </span>
-              <input type="number" value={L} onChange={(e) => setL(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Ancho W (m)
-                <HelpPopover>Ancho total del área que se va a cubrir con la losa.</HelpPopover>
-              </span>
-              <input type="number" value={W} onChange={(e) => setW(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm">
-              <span className="flex items-center">
-                Separación viguetas (cm)
-                <HelpPopover>Distancia de centro a centro entre cada vigueta. Un valor estándar es 50 cm.</HelpPopover>
-              </span>
-              <input type="number" value={s} onChange={(e) => setS(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Apoyo por extremo (cm)
-                <HelpPopover>Longitud extra de la vigueta que descansa sobre el muro o viga en cada extremo. Un valor típico es 10 cm.</HelpPopover>
-              </span>
-              <input type="number" value={apoyo} onChange={(e) => setApoyo(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm">
-              <span className="flex items-center">
-                Largo bloque (m)
-                <HelpPopover>Longitud de los bloques de relleno (ladrillo cerámico o telgopor/EPS) que van entre las viguetas.</HelpPopover>
-              </span>
-              <input type="number" value={lBloque} onChange={(e) => setLBloque(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm">
-              <span className="flex items-center">
-                Capa compresión (cm)
-                <HelpPopover>Espesor de la capa de hormigón que se vierte sobre las viguetas y bloques. Un valor típico es 5 cm.</HelpPopover>
-              </span>
-              <input type="number" value={capa} onChange={(e) => setCapa(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
-
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>Porcentaje de material extra (hormigón, acero) para cubrir pérdidas por cortes y derrames. Un valor común es 8-10%.</HelpPopover>
-              </span>
-              <input type="number" value={waste} onChange={(e) => setWaste(+e.target.value || 0)} className="w-full px-3 py-2" />
-            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Luz L (m)
+                  <HelpPopover>Distancia libre entre los apoyos (vigas o muros) que deben cubrir las viguetas.</HelpPopover>
+                </span>
+              }
+              name="luz_l"
+              unit="m"
+              value={L}
+              onChange={setL}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Ancho W (m)
+                  <HelpPopover>Ancho total del área que se va a cubrir con la losa.</HelpPopover>
+                </span>
+              }
+              name="ancho_w"
+              unit="m"
+              value={W}
+              onChange={setW}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Separación viguetas (cm)
+                  <HelpPopover>Distancia de centro a centro entre cada vigueta. Un valor estándar es 50 cm.</HelpPopover>
+                </span>
+              }
+              name="separacion"
+              unit="cm"
+              value={s}
+              onChange={setS}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Apoyo por extremo (cm)
+                  <HelpPopover>Longitud extra de la vigueta que descansa sobre el muro o viga en cada extremo. Un valor típico es 10 cm.</HelpPopover>
+                </span>
+              }
+              name="apoyo"
+              unit="cm"
+              value={apoyo}
+              onChange={setApoyo}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Largo bloque (m)
+                  <HelpPopover>Longitud de los bloques de relleno (ladrillo cerámico o telgopor/EPS) que van entre las viguetas.</HelpPopover>
+                </span>
+              }
+              name="largo_bloque"
+              unit="m"
+              value={lBloque}
+              onChange={setLBloque}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Capa compresión (cm)
+                  <HelpPopover>Espesor de la capa de hormigón que se vierte sobre las viguetas y bloques. Un valor típico es 5 cm.</HelpPopover>
+                </span>
+              }
+              name="capa_compresion"
+              unit="cm"
+              value={capa}
+              onChange={setCapa}
+            />
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>Porcentaje de material extra (hormigón, acero) para cubrir pérdidas por cortes y derrames. Un valor común es 8-10%.</HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
 
           {/* Malla en capa */}

@@ -12,6 +12,7 @@ import type { MaterialRow } from "@/lib/project/types";
 import { toUnit } from "@/lib/project/helpers";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 /* ----------------------------- Tipos de datos ----------------------------- */
 type CarpetaOptionsFile = {
@@ -410,47 +411,45 @@ function CarpetaCalculator() {
               </label>
             )}
 
-            <label className="text-sm">
-              <span>Largo (m)</span>
-              <input
-                type="number"
-                value={L}
-                onChange={(e) => setL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
-            <label className="text-sm">
-              <span>Ancho (m)</span>
-              <input
-                type="number"
-                value={A}
-                onChange={(e) => setA(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
-            <label className="text-sm col-span-2">
-              <span>Espesor (cm)</span>
-              <input
-                type="number"
+            <NumberWithUnit
+              label="Largo (m)"
+              name="largo"
+              unit="m"
+              value={L}
+              onChange={setL}
+            />
+            <NumberWithUnit
+              label="Ancho (m)"
+              name="ancho"
+              unit="m"
+              value={A}
+              onChange={setA}
+            />
+            <div className="col-span-2">
+              <NumberWithUnit
+                label="Espesor (cm)"
+                name="espesor"
+                unit="cm"
                 value={H}
-                onChange={(e) => setH(+e.target.value || 0)}
-                className="w-full px-3 py-2"
+                onChange={setH}
               />
-            </label>
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>
-                  Este porcentaje agrega material extra para cubrir pérdidas por irregularidades en la superficie, derrames o errores. Un valor común es entre 10% y 15%.
-                </HelpPopover>
-              </span>
-              <input
-                type="number"
+            </div>
+            <div className="col-span-2">
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Desperdicio (%)
+                    <HelpPopover>
+                      Este porcentaje agrega material extra para cubrir pérdidas por irregularidades en la superficie, derrames o errores. Un valor común es entre 10% y 15%.
+                    </HelpPopover>
+                  </span>
+                }
+                name="desperdicio"
+                unit="%"
                 value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
+                onChange={setWaste}
               />
-            </label>
+            </div>
           </div>
 
           {/* Acciones lote local */}
@@ -463,7 +462,6 @@ function CarpetaCalculator() {
             >
               {editIndex !== null ? "Guardar ítem del lote" : "Añadir carpeta al lote"}
             </button>
-            {/* --- AYUDA AÑADIDA AQUÍ --- */}
             <HelpPopover>
               La función 'Lote' te permite calcular varias carpetas (ej: una para cada habitación) y luego guardarlas todas juntas en tu proyecto en un solo paso. Es ideal para cómputos rápidos de múltiples sectores.
             </HelpPopover>
@@ -540,7 +538,6 @@ function CarpetaCalculator() {
 
       {/* Guardar en Proyecto (unitario) */}
       {itemsForProject.length > 0 && (
-        // --- AYUDA AÑADIDA EN EL TÍTULO DE ESTA TARJETA ---
         <div className="card p-4 space-y-3">
             <h3 className="font-semibold flex items-center">
                 Guardar en proyecto

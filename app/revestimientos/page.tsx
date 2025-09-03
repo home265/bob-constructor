@@ -15,6 +15,7 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type RevestOptionsFile = {
   tipos?: (string | { key?: string; label?: string })[];
@@ -340,47 +341,39 @@ function RevestimientosCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span>Largo (m)</span>
-              <input
-                type="number"
-                value={Lx}
-                onChange={(e) => setLx(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Largo (m)"
+              name="largo"
+              unit="m"
+              value={Lx}
+              onChange={setLx}
+            />
 
-            <label className="text-sm">
-              <span>Ancho (m)</span>
-              <input
-                type="number"
-                value={Ly}
-                onChange={(e) => setLy(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Ancho (m)"
+              name="ancho"
+              unit="m"
+              value={Ly}
+              onChange={setLy}
+            />
 
-            <label className="text-sm">
-              <span>Largo pieza (cm)</span>
-              <input
-                type="number"
-                value={lp}
-                onChange={(e) => setLp(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Largo pieza (cm)"
+              name="largo_pieza"
+              unit="cm"
+              value={lp}
+              onChange={setLp}
+            />
 
-            <label className="text-sm">
-              <span>Ancho pieza (cm)</span>
-              <input
-                type="number"
-                value={ap}
-                onChange={(e) => setAp(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Ancho pieza (cm)"
+              name="ancho_pieza"
+              unit="cm"
+              value={ap}
+              onChange={setAp}
+            />
 
-            <label className="text-sm">
+            <label className="text-sm col-span-2">
               <span>Junta (mm)</span>
               <select
                 value={junta}
@@ -395,20 +388,22 @@ function RevestimientosCalculator() {
               </select>
             </label>
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>
-                  Agrega un porcentaje extra de material para cubrir cortes, roturas y ajustes. Para cerámicas y porcelanatos, un valor típico es entre 10% y 15%.
-                </HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>
+                            Agrega un porcentaje extra de material para cubrir cortes, roturas y ajustes. Para cerámicas y porcelanatos, un valor típico es entre 10% y 15%.
+                            </HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
         </div>
 

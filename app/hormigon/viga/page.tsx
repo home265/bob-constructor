@@ -11,6 +11,7 @@ import type { MaterialRow, Unit } from "@/lib/project/types";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 type ConcreteRow = {
   id?: string;
@@ -380,68 +381,70 @@ function VigaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Largo L (m)
-                <HelpPopover>Longitud de la viga entre sus apoyos (columnas o muros).</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Largo L (m)
+                        <HelpPopover>Longitud de la viga entre sus apoyos (columnas o muros).</HelpPopover>
+                    </span>
+                }
+                name="largo"
+                unit="m"
                 value={L}
-                onChange={(e) => setL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Ancho b (cm)
-                <HelpPopover>Ancho de la sección transversal de la viga.</HelpPopover>
-              </span>
-              <input
-                type="number"
+                onChange={setL}
+            />
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Ancho b (cm)
+                        <HelpPopover>Ancho de la sección transversal de la viga.</HelpPopover>
+                    </span>
+                }
+                name="ancho"
+                unit="cm"
                 value={b}
-                onChange={(e) => setB(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
-            <label className="text-sm">
-              <span className="flex items-center">
-                Alto h (cm)
-                <HelpPopover>Altura total de la sección transversal de la viga.</HelpPopover>
-              </span>
-              <input
-                type="number"
+                onChange={setB}
+            />
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Alto h (cm)
+                        <HelpPopover>Altura total de la sección transversal de la viga.</HelpPopover>
+                    </span>
+                }
+                name="alto"
+                unit="cm"
                 value={h}
-                onChange={(e) => setH(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+                onChange={setH}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Recubrimiento (cm)
-                <HelpPopover>Capa de hormigón que protege al acero. Es la distancia desde el borde de la viga hasta el estribo. Un valor típico es 2-3 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Recubrimiento (cm)
+                        <HelpPopover>Capa de hormigón que protege al acero. Es la distancia desde el borde de la viga hasta el estribo. Un valor típico es 2-3 cm.</HelpPopover>
+                    </span>
+                }
+                name="recubrimiento"
+                unit="cm"
                 value={cover}
-                onChange={(e) => setCover(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+                onChange={setCover}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas. Un valor común es 5-10%.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>Porcentaje de hormigón y acero extra para compensar pérdidas. Un valor común es 5-10%.</HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
 
           {/* Longitudinales */}
@@ -464,44 +467,47 @@ function VigaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Barras sup (uds)
-                <HelpPopover>Cantidad de barras de acero en la parte superior de la viga.</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Barras sup (uds)
+                        <HelpPopover>Cantidad de barras de acero en la parte superior de la viga.</HelpPopover>
+                    </span>
+                }
+                name="barras_sup"
+                unit="uds"
                 value={nSup}
-                onChange={(e) => setNSup(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+                onChange={(v) => setNSup(Math.round(v))}
+                step={1}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Barras inf (uds)
-                <HelpPopover>Cantidad de barras de acero en la parte inferior de la viga.</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Barras inf (uds)
+                        <HelpPopover>Cantidad de barras de acero en la parte inferior de la viga.</HelpPopover>
+                    </span>
+                }
+                name="barras_inf"
+                unit="uds"
                 value={nInf}
-                onChange={(e) => setNInf(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+                onChange={(v) => setNInf(Math.round(v))}
+                step={1}
+            />
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Barras extras (uds)
-                <HelpPopover>Cantidad de barras adicionales (ej: perchas o refuerzos en el alma de la viga).</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Barras extras (uds)
+                        <HelpPopover>Cantidad de barras adicionales (ej: perchas o refuerzos en el alma de la viga).</HelpPopover>
+                    </span>
+                }
+                name="barras_extras"
+                unit="uds"
                 value={nExt}
-                onChange={(e) => setNExt(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+                onChange={(v) => setNExt(Math.round(v))}
+                step={1}
+            />
           </div>
 
           {/* Estribos */}
@@ -524,31 +530,33 @@ function VigaCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span className="flex items-center">
-                Separación e (cm)
-                <HelpPopover>Distancia a lo largo de la viga entre cada estribo. Un valor común es 15 o 20 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
+            <NumberWithUnit
+                label={
+                    <span className="flex items-center">
+                        Separación e (cm)
+                        <HelpPopover>Distancia a lo largo de la viga entre cada estribo. Un valor común es 15 o 20 cm.</HelpPopover>
+                    </span>
+                }
+                name="separacion_estribos"
+                unit="cm"
                 value={s}
-                onChange={(e) => setS(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+                onChange={setS}
+            />
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Ganchos (cm)
-                <HelpPopover>Longitud extra de acero en los extremos de cada estribo para asegurar el anclaje. Un valor típico es 10 cm.</HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={hook}
-                onChange={(e) => setHook(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Ganchos (cm)
+                            <HelpPopover>Longitud extra de acero en los extremos de cada estribo para asegurar el anclaje. Un valor típico es 10 cm.</HelpPopover>
+                        </span>
+                    }
+                    name="ganchos"
+                    unit="cm"
+                    value={hook}
+                    onChange={setHook}
+                />
+            </div>
           </div>
         </div>
 

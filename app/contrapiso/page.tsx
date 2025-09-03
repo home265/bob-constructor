@@ -14,6 +14,7 @@ import { toUnit } from "@/lib/project/helpers";
 import { useSearchParams } from "next/navigation";
 import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
+import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
 /* ----------------------------- Tipos de datos ----------------------------- */
 type CptoOptions = {
@@ -350,35 +351,32 @@ function ContrapisoCalculator() {
               </select>
             </label>
 
-            <label className="text-sm">
-              <span>Largo (m)</span>
-              <input
-                type="number"
-                value={L}
-                onChange={(e) => setL(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Largo (m)"
+              name="largo"
+              unit="m"
+              value={L}
+              onChange={setL}
+            />
 
-            <label className="text-sm">
-              <span>Ancho (m)</span>
-              <input
-                type="number"
-                value={A}
-                onChange={(e) => setA(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <NumberWithUnit
+              label="Ancho (m)"
+              name="ancho"
+              unit="m"
+              value={A}
+              onChange={setA}
+            />
 
-            <label className="text-sm col-span-2">
-              <span>Espesor (cm)</span>
-              <input
-                type="number"
+            <div className="col-span-2">
+              <NumberWithUnit
+                label="Espesor (cm)"
+                name="espesor"
+                unit="cm"
                 value={H}
-                onChange={(e) => setH(+e.target.value || 0)}
-                className="w-full px-3 py-2"
+                onChange={setH}
               />
-            </label>
+            </div>
+
 
             {!!mallas.length && (
               <label className="text-sm col-span-2">
@@ -400,20 +398,22 @@ function ContrapisoCalculator() {
               </label>
             )}
 
-            <label className="text-sm col-span-2">
-              <span className="flex items-center">
-                Desperdicio (%)
-                <HelpPopover>
-                  Este porcentaje agrega material extra para cubrir pérdidas por cortes, roturas o errores durante la obra. Un valor común es entre 5% y 15%.
-                </HelpPopover>
-              </span>
-              <input
-                type="number"
-                value={waste}
-                onChange={(e) => setWaste(+e.target.value || 0)}
-                className="w-full px-3 py-2"
-              />
-            </label>
+            <div className="col-span-2">
+                <NumberWithUnit
+                    label={
+                        <span className="flex items-center">
+                            Desperdicio (%)
+                            <HelpPopover>
+                            Este porcentaje agrega material extra para cubrir pérdidas por cortes, roturas o errores durante la obra. Un valor común es entre 5% y 15%.
+                            </HelpPopover>
+                        </span>
+                    }
+                    name="desperdicio"
+                    unit="%"
+                    value={waste}
+                    onChange={setWaste}
+                />
+            </div>
           </div>
 
           {/* Acciones lote local */}

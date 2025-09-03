@@ -24,7 +24,7 @@ export default function NumberWithUnit({
   min = 0,
 }: Props) {
   // --- TODA TU LÓGICA DE ESTADO Y FUNCIONES PERMANECE 100% INTACTA ---
-  const [raw, setRaw] = useState<string>(value === 0 ? "0" : String(value ?? ""));
+  const [raw, setRaw] = useState<string>(String(value ?? ""));
 
   const reInput = useMemo(
     () => (min < 0 ? /^-?\d*(?:[.,]\d*)?$/ : /^\d*(?:[.,]\d*)?$/),
@@ -32,13 +32,20 @@ export default function NumberWithUnit({
   );
 
   useEffect(() => {
-    const next = value === 0 ? "0" : String(value ?? "");
-    if (next !== raw) setRaw(next);
+    const nextValue = String(value ?? "");
+    // No actualices si el campo está vacío y el valor es 0,
+    // para permitir al usuario borrar el cero.
+    if (raw === "" && value === 0) {
+      return;
+    }
+    if (nextValue !== raw) {
+      setRaw(nextValue);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   const toNumber = (s: string) => {
-    if (s.trim() === "") return NaN;
+    if (s.trim() === "" || s.trim() === "-") return NaN;
     return parseFloat(s.replace(",", "."));
   };
 
@@ -50,7 +57,7 @@ export default function NumberWithUnit({
 
   const commit = () => {
     let n = toNumber(raw);
-    if (!Number.isFinite(n)) n = typeof value === "number" ? value : 0;
+    if (!Number.isFinite(n)) n = 0;
     if (typeof min === "number" && n < min) n = min;
     const val = roundToStep(n);
     onChange(val);
@@ -61,8 +68,28 @@ export default function NumberWithUnit({
     if (e.key === "Enter") {
       (e.currentTarget as HTMLInputElement).blur();
     } else if (e.key === "Escape") {
-      setRaw(value === 0 ? "0" : String(value ?? ""));
+      setRaw(String(value ?? ""));
       (e.currentTarget as HTMLInputElement).blur();
+    }
+  };
+  
+  const onChangeHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value;
+
+    // Si el valor actual es '0' y el usuario escribe un número, reemplaza el '0'.
+    if (raw === "0" && v.length > 1 && v.startsWith("0") && !v.startsWith("0.")) {
+      v = v.substring(1);
+    }
+    
+    if (reInput.test(v) || v === "" || v === "-") {
+      setRaw(v);
+      const n = toNumber(v);
+      if (Number.isFinite(n) && !(typeof min === "number" && n < min)) {
+        onChange(n);
+      } else if (v.trim() === "") {
+        // Si el campo se vacía, el valor subyacente es 0
+        onChange(0);
+      }
     }
   };
 
@@ -84,16 +111,7 @@ export default function NumberWithUnit({
           value={raw}
           aria-invalid={isLiveBelowMin || undefined}
           title={isLiveBelowMin ? `Mínimo: ${min}` : undefined}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (reInput.test(v) || v === "") {
-              setRaw(v);
-              const n = toNumber(v);
-              if (Number.isFinite(n) && !(typeof min === "number" && n < min)) {
-                onChange(n);
-              }
-            }
-          }}
+          onChange={onChangeHandler}
           onBlur={commit}
           onKeyDown={onKeyDown}
         />
