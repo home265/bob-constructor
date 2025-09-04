@@ -1,0 +1,6 @@
+[
+  { "id": "tierra_comun", "label": "Tierra común / Arcilla seca", "factor": 1.25 },
+  { "id": "arcilla_humeda", "label": "Arcilla húmeda", "factor": 1.40 },
+  { "id": "tierra_rocosa", "label": "Tierra con rocas / Tosca", "factor": 1.60 },
+  { "id": "roca_volada", "label": "Roca volada", "factor": 1.75 }
+]

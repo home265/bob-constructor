@@ -3,10 +3,16 @@ export const PI = Math.PI;
 export const STEEL_RHO = 7850; // kg/m³ (acero)
 
 // --- Utilidades generales
-export function round2(n: number) {
+/**
+ * Redondea un número a una cantidad específica de decimales.
+ * @param n El número a redondear.
+ * @param decimals La cantidad de decimales a la que se redondeará (por defecto es 2).
+ */
+export function round2(n: number, decimals = 2): number {
   const x = Number(n);
   if (!isFinite(x)) return 0;
-  return Math.round(x * 100) / 100;
+  const f = Math.pow(10, decimals);
+  return Math.round(x * f) / f;
 }
 
 // Redondeo hacia arriba al múltiplo "step" (p.ej. bolsas de 50 kg, cajas de 1 ud)

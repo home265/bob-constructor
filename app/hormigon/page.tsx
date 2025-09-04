@@ -30,7 +30,18 @@ const items = [
     href: "/hormigon/viga",
     title: "Viga",
     desc: "Cargas/esfuerzos típicos y materiales para vigas."
-  }
+  },
+  {
+  href: "/hormigon/zapatas",
+  title: "Zanjas y Zapatas Corridas",
+  desc: "Calcula excavación, hormigón y acero para vigas de fundación."
+},
+{
+  href: "/hormigon/escalera",
+  title: "Escalera",
+  desc: "Diseña y calcula los materiales para escaleras de hormigón."
+}
+  
 ];
 
 export default function HormigonHubPage() {

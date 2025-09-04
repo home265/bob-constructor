@@ -76,7 +76,8 @@ function MurosCalculator() {
     { lv: 0, hv: 0 },
   ]);
   const [res, setRes] = useState<WallResult | null>(null);
-
+  const [incluyeEncadenado, setIncluyeEncadenado] = useState(true);
+  const [metrosDinteles, setMetrosDinteles] = useState(0);
   // Lote local
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -483,7 +484,39 @@ function MurosCalculator() {
                 onChange={(v) => setValue("SA", v)}
               />
             </div>
-
+{/* --- NUEVA SECCIÓN PARA ELEMENTOS ESTRUCTURALES --- */}
+            <div className="col-span-3 pt-4 border-t border-border">
+              <h3 className="font-medium mb-2">Elementos Estructurales Adicionales</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <label className="text-sm flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={incluyeEncadenado}
+                    onChange={(e) => setIncluyeEncadenado(e.target.checked)}
+                  />
+                  <span className="flex items-center">
+                    Incluir Encadenado Superior
+                    <HelpPopover>
+                      Calcula el hormigón y acero para una viga de encadenado de 18x18cm sobre toda la longitud del muro. Es una práctica estándar para dar rigidez y distribuir cargas.
+                    </HelpPopover>
+                  </span>
+                </label>
+                <NumberWithUnit
+                  label={
+                    <span className="flex items-center">
+                      Metros lineales de Dinteles
+                      <HelpPopover>
+                        Suma la longitud de todas las vigas que van sobre puertas y ventanas (dinteles). Se calculan con una sección de 18x18cm.
+                      </HelpPopover>
+                    </span>
+                  }
+                  name="dinteles"
+                  unit="m"
+                  value={metrosDinteles}
+                  onChange={setMetrosDinteles}
+                />
+              </div>
+            </div>
             {/* Vanos */}
             <div className="space-y-2">
               <div className="font-medium">

@@ -49,6 +49,9 @@ export type WallFormInput = {
   SA?: number; // superficie adicional
   vanos: Opening[]; // hasta 3
   desperdicioPct?: number; // si no, usar defaults
+  // Campos añadidos para elementos estructurales
+  incluyeEncadenado?: boolean;
+  metrosDinteles?: number;
 };
 
 export type WallResult = {
@@ -59,4 +62,7 @@ export type WallResult = {
   cal_kg: number;
   agua_l: number;
   avisos?: string[];
+  // Campos añadidos para elementos estructurales
+  hormigonVigas_m3?: number;
+  aceroVigas_kg?: number;
 };
