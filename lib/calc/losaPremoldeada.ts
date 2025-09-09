@@ -51,7 +51,7 @@ export type LosaPremResult = {
   };
 };
 
-function safeN(n: any, d = 0) {
+function safeN(n: unknown, d = 0): number {
   const x = Number(n);
   return Number.isFinite(x) ? x : d;
 }

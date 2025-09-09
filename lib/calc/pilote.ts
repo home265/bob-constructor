@@ -1,5 +1,6 @@
 // lib/calc/pilote.ts
 import { PI, round2, steelKg } from "@/lib/calc/rc";
+import { CheckMessage } from "@/lib/checks/messages";
 
 export type PiloteInput = {
   // Geometría
@@ -56,14 +57,24 @@ export type PiloteResult = {
     kg_m?: number;
     kg: number;
   };
+
+  // Opcionales agregados (no rompen compatibilidad)
+  warnings?: CheckMessage[];
+  assumptions?: string[];
+  fuente_id?: string;
 };
 
-function safeN(n: any, d = 0) {
+function safeN(n: unknown, d = 0): number {
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  if (typeof n === "string") {
+    const x = Number(n);
+    if (Number.isFinite(x)) return x;
+  }
   const x = Number(n);
   return Number.isFinite(x) ? x : d;
 }
 
-function kgPorMetro(map: PiloteInput["rebarTable"], phi_mm?: number) {
+function kgPorMetro(map: PiloteInput["rebarTable"], phi_mm?: number): number | undefined {
   if (!map || !phi_mm) return undefined;
   const key = String(phi_mm);
   const row = map[key] || map[`${phi_mm}`];
@@ -126,7 +137,7 @@ export function calcPilote(input: PiloteInput): PiloteResult {
   // ---- Espiral (hélice)
   const phiS = safeN(spiral?.phi_mm) || 0;
   const pitch_m = Math.max(0, safeN(spiral?.pitch_cm) / 100);
-  const extra_m = Math.max(0, safeN(spiral?.extra_m, 0.2)); // 20 cm por defecto
+  const extraDefault_m = Math.max(0, safeN(spiral?.extra_m, 0.2)); // 20 cm por defecto
   let kgSp = 0;
   let detSp: PiloteResult["espiral"] | undefined;
 
@@ -136,7 +147,7 @@ export function calcPilote(input: PiloteInput): PiloteResult {
     // longitud por vuelta de una hélice: sqrt((2πr)^2 + pitch^2)
     const perTurn = Math.sqrt(Math.pow(2 * PI * r, 2) + Math.pow(pitch_m, 2));
     const vueltas = L / pitch_m;
-    const largo_total = perTurn * vueltas + extra_m;
+    const largo_total = perTurn * vueltas + extraDefault_m;
 
     const kgmS = kgPorMetro(rebarTable, phiS);
     let kg: number;
@@ -161,6 +172,42 @@ export function calcPilote(input: PiloteInput): PiloteResult {
 
   const aceroTot = round2(kgLong + kgSp);
 
+  // Chequeos ligeros (no normativos)
+  const warnings: CheckMessage[] = [];
+  if (cover_cm < 5) {
+    warnings.push({
+      code: "PILE_COVER_LOW",
+      severity: "warning",
+      title: "Recubrimiento bajo para pilote",
+      details: "Usualmente se adopta ≥ 5 cm en fundaciones.",
+      help: "Aumentar recubrimiento si las condiciones de exposición son severas."
+    });
+  }
+  if (spiral?.pitch_cm !== undefined && spiral.pitch_cm > 0 && spiral.pitch_cm < 6) {
+    warnings.push({
+      code: "PILE_PITCH_TIGHT",
+      severity: "info",
+      title: "Espiral con paso muy cerrado",
+      details: `Paso indicado: ${round2(spiral.pitch_cm)} cm.`,
+      help: "Verificar disponibilidad y práctica de taller."
+    });
+  }
+  if (spiral?.pitch_cm !== undefined && spiral.pitch_cm > 30) {
+    warnings.push({
+      code: "PILE_PITCH_WIDE",
+      severity: "info",
+      title: "Espiral con paso amplio",
+      details: `Paso indicado: ${round2(spiral.pitch_cm)} cm.`,
+      help: "Asegurar confinamiento adecuado según proyecto."
+    });
+  }
+
+  const assumptions: string[] = [
+    "Longitudinales a lo largo de todo el pilote (sin considerar ganchos/anclajes).",
+    `Hélice con paso constante; extra de empalmes considerado: ${round2(extraDefault_m)} m.`,
+    `Desperdicio aplicado: ${round2(Math.max(0, safeN(wastePct)))}%.`
+  ];
+
   return {
     dimensiones: { L_m: round2(L), d_cm: round2(d_cm), cover_cm: round2(cover_cm) },
     area_seccion_m2: round2(area),
@@ -170,6 +217,9 @@ export function calcPilote(input: PiloteInput): PiloteResult {
     acero_total_kg: aceroTot,
     longitudinal: detLong,
     espiral: detSp,
+    warnings,
+    assumptions,
+    fuente_id: "guia_obras_vivienda"
   };
 }
 

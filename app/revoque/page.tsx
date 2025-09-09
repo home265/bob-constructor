@@ -37,7 +37,22 @@ const TERM_LABELS: Record<string, string> = {
 };
 
 type LadoKey = "uno" | "dos" | "ambos";
-type Morteros = Record<string, any> | any[];
+
+// ----- Tipos para morteros (sin any) -----
+type MortarProporcion = {
+  cemento?: number;
+  cal?: number;
+  arena?: number;
+};
+type MortarFicha = {
+  id?: string;
+  bolsas_cemento_por_m3?: number;
+  kg_cal_por_m3?: number;
+  agua_l_por_m3?: number;
+  arena_m3_por_m3?: number;
+  proporcion?: MortarProporcion;
+};
+type Morteros = Record<string, MortarFicha> | MortarFicha[];
 
 // ------- helper Unit (evita errores de tipos) -------
 function normalizeUnit(u: string): Unit {
@@ -73,7 +88,7 @@ function RevoqueCalculator() {
   });
 
   // Morteros (para desglosar cemento/cal/arena/agua)
-  const morteros = useJson<Morteros>("/data/mortars.json", {});
+  const morteros = useJson<Morteros>("/data/mortars.json", {} as Record<string, MortarFicha>);
 
   // Normalizo lados
   const ladosOpts = useMemo(
@@ -133,12 +148,22 @@ function RevoqueCalculator() {
   }, [terminaciones, lado]);
 
   // (C) precargar desde partida si viene deep-link (async)
+  type RevoqueInputsSaved = {
+    lados?: LadoKey;
+    term1?: string;
+    term2?: string;
+    L?: number;
+    H?: number;
+    e_cm?: number;
+    wastePct?: number;
+  };
+
   useEffect(() => {
     if (!projectId || !partidaId) return;
     (async () => {
       const p = await getPartida(projectId, partidaId);
       if (!p?.inputs) return;
-      const inp = p.inputs as any;
+      const inp = p.inputs as RevoqueInputsSaved;
       if (inp.lados) setLado(inp.lados);
       if (inp.term1) setTerm1(inp.term1);
       if (inp.term2) setTerm2(inp.term2);
@@ -149,10 +174,38 @@ function RevoqueCalculator() {
     })();
   }, [projectId, partidaId]);
 
-  // Cálculo
-  const calc: any =
-    // @ts-ignore
-    C.calcRevoque ?? C.default ?? ((x: any) => x);
+  // Cálculo (tipado sin any)
+  type RevoqueCalcInput = {
+    lados: LadoKey;
+    term1: string;
+    term2: string;
+    L: number;
+    H: number;
+    e_cm: number;
+    wastePct: number;
+  };
+  type RevoqueResult = {
+    mortero_con_desperdicio_m3?: number;
+    mortero_m3?: number;
+    materiales?: Record<string, number>;
+    area_m2?: number;
+    espesor_cm?: number;
+    mortero_id?: string;
+  };
+  type RevoqueModuleShape = {
+    calcRevoque?: (x: RevoqueCalcInput) => RevoqueResult;
+    default?: (x: RevoqueCalcInput) => RevoqueResult;
+  };
+
+  const mod = C as RevoqueModuleShape;
+
+  const calc: (x: RevoqueCalcInput) => RevoqueResult =
+    mod.calcRevoque ??
+    mod.default ??
+    ((x) => ({
+      area_m2: x.L * x.H * (x.lados === "ambos" ? 2 : 1),
+      espesor_cm: x.e_cm,
+    }));
 
   const res = calc({
     lados: lado, // "uno" | "dos" | "ambos"
@@ -166,9 +219,14 @@ function RevoqueCalculator() {
 
   // --------- (B) Materiales completos: desglosar mortero ----------
   const area = (L || 0) * (H || 0) * (lado === "ambos" ? 2 : 1);
-  const mortVol =
-    (typeof res?.mortero_con_desperdicio_m3 === "number" && res.mortero_con_desperdicio_m3) ??
-    (typeof res?.mortero_m3 === "number" ? res.mortero_m3 : 0);
+
+  // Evitar union number | boolean
+  const mortVol: number =
+    typeof res?.mortero_con_desperdicio_m3 === "number"
+      ? res.mortero_con_desperdicio_m3
+      : typeof res?.mortero_m3 === "number"
+      ? res.mortero_m3
+      : 0;
 
   // Acumulo lo que ya venga del cálculo
   const matAcum: Record<string, number> = {};
@@ -179,7 +237,7 @@ function RevoqueCalculator() {
   }
 
   // Identificar mortero a partir del propio resultado o de la terminación
-  const resMortarId = (res as any)?.mortero_id as string | undefined;
+  const resMortarId = res.mortero_id;
 
   let mortarIdToUse: string | undefined;
   if (resMortarId) {
@@ -189,10 +247,14 @@ function RevoqueCalculator() {
     mortarIdToUse = term1;
   }
 
-  const findMortar = (id?: string) => {
+  const findMortar = (id?: string): MortarFicha | undefined => {
     if (!id) return undefined;
-    if (Array.isArray(morteros)) return morteros.find((m: any) => m?.id === id);
-    return (morteros as any)[id] || undefined;
+    if (Array.isArray(morteros)) {
+      const arr = morteros as MortarFicha[];
+      return arr.find((m) => m?.id === id);
+    }
+    const rec = morteros as Record<string, MortarFicha>;
+    return rec[id];
   };
 
   const mortar = findMortar(mortarIdToUse);
@@ -299,7 +361,7 @@ function RevoqueCalculator() {
       e_cm: number;
       wastePct: number;
     };
-    outputs: Record<string, any>;
+    outputs: Record<string, unknown>;
   };
 
   const [batch, setBatch] = useState<BatchItem[]>([]);
@@ -319,7 +381,7 @@ function RevoqueCalculator() {
         e_cm: e,
         wastePct: waste,
       },
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
     };
     setBatch((prev) => {
       if (editIndex !== null) {
@@ -364,7 +426,7 @@ function RevoqueCalculator() {
         e_cm: e,
         wastePct: waste,
       },
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
       materials: itemsForProject,
     });
     alert("Partida actualizada.");

@@ -8,8 +8,20 @@ export type RevestInput = {
   pieza_cm: { LP: number; AP: number }; // tamaño de pieza
   junta_mm: number;
   wastePct?: number;
-  coeffs?: Record<string, any>;  // puede traer m2_por_caja o pzas_por_caja
-  pastina?: Record<string, any>; // puede traer kg_por_m2 por junta u otros
+  coeffs?: RevestCoeffs;   // puede traer m2_por_caja o pzas_por_caja
+  pastina?: PastinaCoeffs; // puede traer kg_por_m2 por junta u otros
+};
+
+export type RevestCoeffsEntry = {
+  m2_por_caja?: number;
+  pzas_por_caja?: number;
+};
+export type RevestCoeffs = Record<string, RevestCoeffsEntry> | RevestCoeffsEntry;
+
+export type PastinaCoeffs = {
+  kg_por_m2?: Record<string, number>;
+  kg_por_m2_default?: number;
+  kg_m2?: number;
 };
 
 export type RevestResult = {
@@ -21,6 +33,15 @@ export type RevestResult = {
   cajas?: number;
   pastina_kg?: number;
 };
+
+function pickCoeffs(coeffs: RevestCoeffs | undefined, tipo: string): RevestCoeffsEntry | undefined {
+  if (!coeffs) return undefined;
+  if ("m2_por_caja" in coeffs || "pzas_por_caja" in coeffs) {
+    return coeffs as RevestCoeffsEntry;
+  }
+  const dict = coeffs as Record<string, RevestCoeffsEntry>;
+  return dict[tipo];
+}
 
 export function calcRevestimientos(input: RevestInput): RevestResult {
   const { L, A, pieza_cm, junta_mm, wastePct = 0, tipo, coeffs, pastina } = input;
@@ -43,7 +64,7 @@ export function calcRevestimientos(input: RevestInput): RevestResult {
   };
 
   // Cajas (si hay info)
-  const c = coeffs?.[tipo] ?? coeffs;
+  const c = pickCoeffs(coeffs, tipo);
   if (c) {
     let m2_por_caja: number | undefined = c.m2_por_caja;
     if (!m2_por_caja && typeof c.pzas_por_caja === "number") {

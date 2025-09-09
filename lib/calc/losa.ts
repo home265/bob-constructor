@@ -1,5 +1,7 @@
 // lib/calc/losa.ts
 import { round2 } from "@/lib/calc/rc";
+import { checkSlabBasics, SlabCheckInput } from "@/lib/checks/struct_basics";
+import { CheckMessage } from "@/lib/checks/messages";
 
 export type LosaInput = {
   // Geometría
@@ -26,6 +28,9 @@ export type LosaInput = {
     doubleLayer?: boolean; // 2 capas
   };
   rebarTable?: Record<string, { kg_m?: number; label?: string }>;
+
+  // Contexto (opcional) para chequeos básicos
+  usage?: "vivienda" | "comercial_liviano";
 };
 
 export type LosaResult = {
@@ -50,6 +55,11 @@ export type LosaResult = {
     x?: { phi_mm: number; n: number; largo_unit_m: number; largo_total_m: number; kg_m?: number; kg?: number; spacing_cm?: number };
     y?: { phi_mm: number; n: number; largo_unit_m: number; largo_total_m: number; kg_m?: number; kg?: number; spacing_cm?: number };
   };
+
+  // Nuevo: chequeos y metadatos (opcionales)
+  warnings?: CheckMessage[];
+  assumptions?: string[];
+  fuente_id?: string;
 };
 
 // 👉 Alias interno para evitar indexar un tipo opcional
@@ -82,6 +92,7 @@ export function calcLosa(input: LosaInput): LosaResult {
     meshDoubleLayer = false,
     bars,
     rebarTable = {},
+    usage = "vivienda",
   } = input;
 
   const Lx = Math.max(0, safeN(Lx_m));
@@ -91,10 +102,27 @@ export function calcLosa(input: LosaInput): LosaResult {
   const vol = area * (H / 100);
   const fWaste = 1 + Math.max(0, safeN(wastePct)) / 100;
   const volW = vol * fWaste;
+
   // Regla simple de pre-dimensionado: H ≥ max(10 cm, L/25)
   const L_control_m = Math.max(Lx, Ly);
   const espesor_sugerido_cm = Math.max(10, Math.round((L_control_m * 100) / 25));
   const regla_espesor = "H ≥ max(10 cm, L/25)";
+
+  // Chequeos básicos (no normativos)
+  const checkInput: SlabCheckInput = {
+    span_m: L_control_m,
+    thickness_cm: H,
+    usage
+  };
+  const warnings: CheckMessage[] = checkSlabBasics(checkInput);
+
+  // Supuestos visibles en memoria
+  const assumptions: string[] = [
+    "Regla de espesor: H ≥ max(10 cm, L/25) para losa maciza.",
+    `Uso declarado: ${usage}.`,
+    `Desperdicio aplicado: ${round2(Math.max(0, safeN(wastePct)))}%.`
+  ];
+
   // --- Malla
   if (mallaId && meshTable[mallaId]?.kg_m2) {
     const kg_m2 = safeN(meshTable[mallaId].kg_m2, 0);
@@ -112,6 +140,9 @@ export function calcLosa(input: LosaInput): LosaResult {
       malla_kg: round2(mallaKg),
       espesor_sugerido_cm,
       regla_espesor,
+      warnings,
+      assumptions,
+      fuente_id: "guia_obras_vivienda"
     };
   }
 
@@ -187,6 +218,9 @@ export function calcLosa(input: LosaInput): LosaResult {
       x: detX,
       y: detY,
     },
+    warnings,
+    assumptions,
+    fuente_id: "guia_obras_vivienda"
   };
 }
 

@@ -37,6 +37,32 @@ type PiloteInputs = {
   spiral: { phi_mm: number; pitch_cm: number; extra_m: number };
 };
 
+// Tipos de cálculo (entrada/salida) esperados del módulo de cálculo
+type PiloteCalcInput = PiloteInputs & {
+  rebarTable: Record<string, { kg_m?: number; label?: string }>;
+};
+type PiloteResultPartial = {
+  volumen_con_desperdicio_m3?: number;
+  volumen_m3?: number;
+  area_seccion_m2?: number;
+  longitudinal?: {
+    phi_mm: number;
+    largo_total_m: number;
+    largo_unit_m: number;
+    n: number;
+    kg: number;
+  };
+  espiral?: {
+    phi_mm: number;
+    largo_total_m: number;
+    pitch_cm: number;
+    vueltas: number;
+    kg: number;
+  };
+  acero_total_kg?: number;
+  materiales?: Record<string, number>;
+};
+
 // Unit normalizer (por si el mapper devuelve variantes)
 function normalizeUnit(u: string): Unit {
   const s = (u || "").toLowerCase();
@@ -134,8 +160,28 @@ function PiloteCalculator() {
     return m;
   }, [rebarOpts]);
 
-  // Cálculo (fallback resistente)
-  const calc = (C as any).calcPilote ?? (C as any).default ?? ((x: any) => x);
+  // Cálculo (fallback tipado y seguro)
+  const mod = C as {
+    calcPilote?: (x: PiloteCalcInput) => PiloteResultPartial;
+    default?: (x: PiloteCalcInput) => PiloteResultPartial;
+  };
+
+  const fallbackCalc = (x: PiloteCalcInput): PiloteResultPartial => {
+    const d_m = Math.max(0, x.d_cm) / 100;
+    const L_m = Math.max(0, x.L_m);
+    const A = Math.PI * (d_m / 2) * (d_m / 2);
+    const vol = A * L_m;
+    const f = 1 + Math.max(0, x.wastePct) / 100;
+    return {
+      area_seccion_m2: Math.round(A * 100) / 100,
+      volumen_m3: Math.round(vol * 100) / 100,
+      volumen_con_desperdicio_m3: Math.round(vol * f * 100) / 100,
+    };
+  };
+
+  const calc: (x: PiloteCalcInput) => PiloteResultPartial =
+    mod.calcPilote ?? mod.default ?? fallbackCalc;
+
   const res = calc({
     L_m: L,
     d_cm: d,
@@ -150,7 +196,7 @@ function PiloteCalculator() {
   // (B) Desglose del hormigón (si tu JSON trae coeficientes por m³)
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const vol = res?.volumen_con_desperdicio_m3 ?? res?.volumen_m3 ?? 0;
-  const concRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concRow: ConcreteRow | undefined = (concrete as Record<string, ConcreteRow>)[concreteId];
   const concBreakdown: Record<string, number> = {};
   if (vol > 0 && concRow) {
     const bolsas = concRow.bolsas_cemento_por_m3 ?? concRow.cemento_bolsas_por_m3;
@@ -237,7 +283,7 @@ function PiloteCalculator() {
         key: k,
         label: keyToLabel(k),
         qty: round2(Number(v) || 0),
-        unit: normalizeUnit(keyToUnit(k) as any),
+        unit: normalizeUnit(keyToUnit(k) as unknown as string),
       });
     }
 
@@ -251,8 +297,8 @@ function PiloteCalculator() {
     kind: "pilote";
     title: string;
     materials: MaterialRow[];
-    inputs: PiloteInputs | any;
-    outputs: Record<string, any>;
+    inputs: PiloteInputs;
+    outputs: Record<string, unknown>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -272,7 +318,7 @@ function PiloteCalculator() {
       title: defaultTitle,
       materials: itemsForProject,
       inputs,
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
     };
     setBatch((prev) => {
       if (editIndex !== null) {
@@ -325,7 +371,7 @@ function PiloteCalculator() {
         long: { phi_mm: phiL, n: nL },
         spiral: { phi_mm: phiS, pitch_cm: pitch, extra_m: extra },
       } satisfies PiloteInputs,
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
       materials: itemsForProject,
     });
     alert("Partida actualizada.");

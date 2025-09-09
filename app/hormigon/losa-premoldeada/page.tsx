@@ -51,6 +51,9 @@ function normalizeUnit(u: string): Unit {
   return "u";
 }
 
+type LosaPremInput = C.LosaPremInput;
+type LosaPremResult = C.LosaPremResult;
+
 function LosaPremoldeadaCalculator() {
   const sp = useSearchParams();
   const projectId = sp.get("projectId");
@@ -133,11 +136,62 @@ function LosaPremoldeadaCalculator() {
     return m;
   }, [meshOpts]);
 
-  // Fallback a default si cambia la export
+  interface LosaPremModule {
+    calcLosaPremoldeada?: (x: LosaPremInput) => LosaPremResult;
+    default?: (x: LosaPremInput) => LosaPremResult;
+  }
+  const mod = C as unknown as LosaPremModule;
+
+  const fallbackCalc = (x: LosaPremInput): LosaPremResult => {
+  const area = Math.max(0, x.L_m) * Math.max(0, x.W_m);
+  const s_m = Math.max(0, x.spacing_cm) / 100;
+  const apoyo_m = Math.max(0, x.apoyo_cm ?? 0) / 100;
+  const nVig = s_m > 0 ? Math.floor(x.W_m / s_m) + 1 : 0;
+  const largoVig = x.L_m + 2 * apoyo_m;
+
+  // manejar largo_bloque_m opcional (default típico 0.60 m)
+  const lb = typeof x.largo_bloque_m === "number" ? x.largo_bloque_m : 0.6;
+
+  const porVig = lb > 0 ? Math.ceil(x.L_m / lb) : 0;
+  const bloquesTot = nVig * porVig;
+
+  const volCapa = area * (Math.max(0, x.capa_cm) / 100);
+  const fWaste = 1 + Math.max(0, x.wastePct ?? 0) / 100;
+  const volCapaW = volCapa * fWaste;
+
+  const out: LosaPremResult = {
+    area_m2: Math.round(area * 100) / 100,
+    viguetas: {
+      qty: nVig,
+      largo_unit_m: Math.round(largoVig * 100) / 100,
+      largo_total_m: Math.round(nVig * largoVig * 100) / 100,
+    },
+    bloques: {
+      qty: bloquesTot,
+      por_vigueta: porVig,
+      largo_unit_m: Math.round(lb * 100) / 100,
+    },
+    capa: {
+      volumen_m3: Math.round(volCapa * 100) / 100,
+      volumen_con_desperdicio_m3: Math.round(volCapaW * 100) / 100,
+      espesor_cm: Math.round(x.capa_cm * 100) / 100,
+    },
+  };
+
+  const kg_m2 = x.mallaId ? x.meshTable?.[x.mallaId]?.kg_m2 : undefined;
+  if (kg_m2) {
+    const capas = x.meshDoubleLayer ? 2 : 1;
+    const kg = kg_m2 * area * capas * fWaste;
+    out.malla = { id: x.mallaId!, kg: Math.round(kg * 100) / 100, capas };
+  }
+  return out;
+};
+
+
   const calc =
-    (C as any).calcLosaPremoldeada ??
-    (C as any).default ??
-    ((x: any) => x);
+    mod.calcLosaPremoldeada ??
+    mod.default ??
+    fallbackCalc;
 
   const res = calc({
     L_m: L,
@@ -155,7 +209,7 @@ function LosaPremoldeadaCalculator() {
   // (B) Desglose hormigón de la capa
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const capaVol = (res?.capa?.volumen_con_desperdicio_m3 ?? res?.capa?.volumen_m3) || 0;
-  const concRow: ConcreteRow | undefined = (concrete as any)?.[concreteId];
+  const concRow: ConcreteRow | undefined = concrete[concreteId];
   const matBreakdown: Record<string, number> = {};
   if (capaVol > 0 && concRow) {
     const bolsas = concRow.bolsas_cemento_por_m3 ?? concRow.cemento_bolsas_por_m3;
@@ -252,7 +306,7 @@ function LosaPremoldeadaCalculator() {
         key: k,
         label: keyToLabel(k),
         qty: round2(Number(v) || 0),
-        unit: normalizeUnit(keyToUnit(k) as any),
+        unit: normalizeUnit(keyToUnit(k)),
       });
     }
     return out;
@@ -266,7 +320,7 @@ function LosaPremoldeadaCalculator() {
     title: string;
     materials: MaterialRow[];
     inputs: LosaPremoldeadaInputs;
-    outputs: Record<string, any>;
+    outputs: Record<string, unknown>;
   };
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -289,7 +343,7 @@ function LosaPremoldeadaCalculator() {
       title: defaultTitle,
       materials: itemsForProject,
       inputs,
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
     };
     setBatch((prev) => {
       if (editIndex !== null) {
@@ -345,7 +399,7 @@ function LosaPremoldeadaCalculator() {
         meshDoubleLayer: meshDouble,
         concreteClassId: concreteId,
       } satisfies LosaPremoldeadaInputs,
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
       materials: itemsForProject,
     });
     alert("Partida actualizada.");

@@ -10,6 +10,11 @@ import { getPartida, updatePartida } from "@/lib/project/storage";
 import HelpPopover from "@/components/ui/HelpPopover";
 import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
+// 🔹 Nuevos imports: chequeos y memoria (no afectan lo existente)
+import { checkSlabBasics } from "@/lib/checks/struct_basics";
+import type { CheckMessage } from "@/lib/checks/messages";
+import type { MemoryReport, MemoryEntry } from "@/lib/report/memoria";
+
 type OpcionUso = { key: string; q_kN_m2: number; label: string };
 type OpcionTecho = { key: string; g_kN_m2: number; label: string };
 
@@ -199,6 +204,81 @@ function EstructuraCalculator() {
       materials: itemsForProject,
     });
     alert("Partida actualizada.");
+  };
+
+  // 🔹 Chequeos básicos (losa) y botón para Memoria (PDF)
+  const usageForChecks = useMemo<"vivienda" | "comercial_liviano">(
+    () => (usoKey === "vivienda" ? "vivienda" : "comercial_liviano"),
+    [usoKey]
+  );
+  const slabWarnings = useMemo<CheckMessage[]>(
+    () => checkSlabBasics({ span_m: Math.max(spanX, spanY), thickness_cm: espLosa_cm, usage: usageForChecks }),
+    [spanX, spanY, espLosa_cm, usageForChecks]
+  );
+
+  const handleAddToMemoria = () => {
+    const entry: MemoryEntry = {
+      id: `boceto_${Date.now()}`,
+      titulo: "Boceto estructural (orientativo)",
+      rubro: "general",
+      inputs: {
+        Lx, Ly, nx, ny, plantas,
+        usoKey, techoKey, espLosa_cm, gAcabados,
+        spanX, spanY
+      },
+      supuestos: [
+        "Valores orientativos para pre-dimensionado y presupuesto.",
+        "La losa se verifica con regla de esbeltez simple.",
+        "Resultados a validar por un profesional."
+      ],
+      resultados: {
+        "wX_piso (kN/m)": wX_piso,
+        "Mx_piso (kN·m)": Mx_piso,
+        "Vx_piso (kN)": Vx_piso,
+        "wY_piso (kN/m)": wY_piso,
+        "My_piso (kN·m)": My_piso,
+        "Vy_piso (kN)": Vy_piso,
+        "wX_techo (kN/m)": wX_techo,
+        "Mx_techo (kN·m)": Mx_techo,
+        "Vx_techo (kN)": Vx_techo,
+        "wY_techo (kN/m)": wY_techo,
+        "My_techo (kN·m)": My_techo,
+        "Vy_techo (kN)": Vy_techo,
+        "N interior (kN)": N_int,
+        "N borde (kN)": N_bor,
+        "N esquina (kN)": N_esq
+      },
+      advertencias: slabWarnings.map(w => ({
+        code: w.code,
+        severity: w.severity,
+        title: w.title
+      })),
+      fuente_id: "guia_obras_vivienda"
+    };
+
+    let report: MemoryReport;
+    try {
+      const rawRep = localStorage.getItem("memoria:current");
+      if (rawRep) {
+        report = JSON.parse(rawRep) as MemoryReport;
+      } else {
+        report = {
+          proyecto: "Memoria de cálculos",
+          fechaISO: new Date().toISOString(),
+          entradas: []
+        };
+      }
+    } catch {
+      report = {
+        proyecto: "Memoria de cálculos",
+        fechaISO: new Date().toISOString(),
+        entradas: []
+      };
+    }
+    report.entradas.push(entry);
+    report.fechaISO = new Date().toISOString();
+    localStorage.setItem("memoria:current", JSON.stringify(report));
+    alert("Añadido a la memoria (PDF).");
   };
 
  return (
@@ -421,6 +501,34 @@ function EstructuraCalculator() {
               Solo guía para presupuesto. No sustituye cálculo profesional.
             </div>
           </div>
+
+          {/* 🔹 Chequeos básicos de losa (no intrusivos) */}
+          {slabWarnings.length > 0 && (
+            <section className="mt-3 rounded border p-3">
+              <h3 className="text-sm font-semibold">Chequeos básicos (losa)</h3>
+              <ul className="mt-2 space-y-1">
+                {slabWarnings.map((w) => (
+                  <li key={w.code} className="text-sm">
+                    <span
+                      className={
+                        w.severity === "danger"
+                          ? "text-red-600 font-semibold"
+                          : w.severity === "warning"
+                          ? "text-amber-600 font-semibold"
+                          : "text-sky-700 font-semibold"
+                      }
+                    >
+                      [{w.severity.toUpperCase()}]
+                    </span>{" "}
+                    {w.title}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-foreground/60 mt-2">
+                Reglas de esbeltez orientativas para losa maciza.
+              </p>
+            </section>
+          )}
         </div>
       </div>
 
@@ -440,6 +548,20 @@ function EstructuraCalculator() {
         />
       </div>
 
+      {/* 🔹 Acción extra: añadir esta corrida a la Memoria (PDF) */}
+      <div className="card p-4 space-y-2">
+        <h3 className="font-semibold">Memoria (PDF)</h3>
+        <p className="text-sm text-foreground/70">
+          Guardá esta corrida como entrada de memoria para luego descargar el PDF desde la vista de exportación.
+        </p>
+        <button
+          type="button"
+          className="rounded border px-4 py-2"
+          onClick={handleAddToMemoria}
+        >
+          Añadir a Memoria
+        </button>
+      </div>
 
       {/* Botón (A) para armar lote local rápido */}
       <div>

@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "descripcion": "Consumos típicos orientativos (Argentina). Se usan como rangos recomendados.",
+  "muros": {
+    "ladrillo_hueco_18": {
+      "pzas_por_m2": { "min": 120, "tipico": 130, "max": 140 },
+      "mortero_l_por_m2": { "min": 40, "tipico": 50, "max": 60 },
+      "desperdicio_porcentaje": { "min": 5, "tipico": 8, "max": 12 }
+    }
+  },
+  "revoques": {
+    "tradicional_2cm": {
+      "m3_por_m2": 0.02,
+      "desperdicio_porcentaje": { "min": 5, "tipico": 8, "max": 10 }
+    }
+  },
+  "contrapiso": {
+    "espesor_8cm": {
+      "m3_por_m2": 0.08,
+      "desperdicio_porcentaje": { "min": 5, "tipico": 7, "max": 10 }
+    }
+  },
+  "carpeta": {
+    "espesor_3cm": {
+      "m3_por_m2": 0.03,
+      "desperdicio_porcentaje": { "min": 5, "tipico": 7, "max": 10 }
+    }
+  }
+}

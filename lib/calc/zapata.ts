@@ -1,5 +1,7 @@
 // lib/calc/zapata.ts
 import { round2, stirrupLengthRect, stirrupQty } from "./rc";
+import { checkFootingBasics, FootingCheckInput } from "@/lib/checks/struct_basics";
+import { CheckMessage } from "@/lib/checks/messages";
 
 export type ZapataInput = {
   // Geometría
@@ -35,6 +37,11 @@ export type ZapataResult = {
   acero_estribos_kg: number;
   materiales_hormigon_zapata: Record<string, number>;
   materiales_hormigon_limpieza: Record<string, number>;
+
+  // Opcionales agregados: no rompen compatibilidad
+  warnings?: CheckMessage[];
+  assumptions?: string[];
+  fuente_id?: string;
 };
 
 function kgPorMetro(map: ZapataInput["rebarTable"], phi_mm?: number) {
@@ -94,6 +101,23 @@ export function calcZapata(input: ZapataInput): ZapataResult {
     aceroEstribosKg = qty * largoUnit * kgm * fWaste;
   }
 
+  // 5. Chequeos básicos (no normativos)
+  const assumedColumnSideCm = 20; // Asumimos columna 20×20 cm por no estar en inputs
+  const checkInput: FootingCheckInput = {
+    column_b_cm: assumedColumnSideCm,
+    column_h_cm: assumedColumnSideCm,
+    footing_b_m: ancho_zapata_cm / 100,
+    footing_h_m: alto_zapata_cm / 100,
+    soil_allow_kPa: undefined
+  };
+  const warnings: CheckMessage[] = checkFootingBasics(checkInput);
+
+  const assumptions: string[] = [
+    "Se asume columna de 20×20 cm a efectos de verificaciones básicas.",
+    `Recubrimiento de estribos considerado 5 cm y ganchos de 10 cm en fundaciones.`,
+    `Desperdicio aplicado: ${round2(wastePct)}%.`
+  ];
+
   return {
     volumen_excavacion_m3: round2(volExcavacion),
     volumen_excavacion_esponjado_m3: round2(volExcavacionEsponjado),
@@ -105,5 +129,8 @@ export function calcZapata(input: ZapataInput): ZapataResult {
     acero_total_kg: round2(aceroLongKg + aceroEstribosKg),
     materiales_hormigon_zapata: {}, // Se llenará en la UI
     materiales_hormigon_limpieza: {}, // Se llenará en la UI
+    warnings,
+    assumptions,
+    fuente_id: "guia_obras_vivienda"
   };
 }

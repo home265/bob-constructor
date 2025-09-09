@@ -1,5 +1,7 @@
 // lib/calc/columna.ts
 import { round2, stirrupLengthRect, stirrupQty } from "@/lib/calc/rc";
+import { checkColumnBasics, ColumnCheckInput } from "@/lib/checks/struct_basics";
+import { CheckMessage } from "@/lib/checks/messages";
 
 export type ColumnaInput = {
   // Geometría
@@ -27,6 +29,9 @@ export type ColumnaInput = {
     spacing_cm?: number; // separación uniforme (cm)
     hook_cm?: number;    // ganchos (cm) (típico 10 cm)
   };
+
+  // Contexto (opcional) para chequeos básicos
+  floors_above?: number; // cantidad de pisos por encima (aprox)
 };
 
 export type ColumnaResult = {
@@ -57,9 +62,14 @@ export type ColumnaResult = {
     kg_m?: number;
     kg: number;
   };
+
+  // Nuevo: chequeos y metadatos (opcionales, no rompen compatibilidad)
+  warnings?: CheckMessage[];
+  assumptions?: string[];
+  fuente_id?: string;
 };
 
-function safeN(n: unknown, def = 0) {
+function safeN(n: unknown, def = 0): number {
   if (typeof n === "number" && Number.isFinite(n)) return n;
   if (typeof n === "string") {
     const x = Number(n);
@@ -68,7 +78,7 @@ function safeN(n: unknown, def = 0) {
   return def;
 }
 
-function kgPorMetro(map: ColumnaInput["rebarTable"], phi_mm?: number) {
+function kgPorMetro(map: ColumnaInput["rebarTable"], phi_mm?: number): number | undefined {
   if (!map || !phi_mm) return undefined;
   const key = String(phi_mm);
   const row = map[key] || map[`${phi_mm}`];
@@ -86,6 +96,7 @@ export function calcColumna(input: ColumnaInput): ColumnaResult {
     rebarTable = {},
     vertical,
     stirrups,
+    floors_above
   } = input;
 
   const H = Math.max(0, safeN(H_m));
@@ -99,7 +110,7 @@ export function calcColumna(input: ColumnaInput): ColumnaResult {
   const vol = area * H;
   const volW = vol * fWaste;
 
-  // Verticales
+  // Barras verticales
   const phiV = safeN(vertical?.phi_mm) || 0;
   const nV = Math.max(0, safeN(vertical?.n));
   let detV: ColumnaResult["vertical"] | undefined;
@@ -148,6 +159,22 @@ export function calcColumna(input: ColumnaInput): ColumnaResult {
 
   const aceroTot = round2(kgV + kgS);
 
+  // Chequeos básicos (no normativos), en lenguaje de obra
+  const checkInput: ColumnCheckInput = {
+    clear_height_m: H,
+    section_b_cm: b_cm,
+    section_h_cm: h_cm,
+    floors_above: floors_above ?? 1
+  };
+  const warnings: CheckMessage[] = checkColumnBasics(checkInput);
+
+  // Supuestos visibles en memoria
+  const assumptions: string[] = [
+    "Mínimos de vivienda: columna típica ≥ 20×20 cm.",
+    "Esbeltez geométrica controlada por altura libre y lado menor.",
+    `Desperdicio aplicado: ${round2(Math.max(0, safeN(wastePct)))}%.`
+  ];
+
   return {
     dimensiones: { H_m: round2(H), b_cm: round2(b_cm), h_cm: round2(h_cm), cover_cm: round2(cover_cm) },
     area_seccion_m2: round2(area),
@@ -157,6 +184,9 @@ export function calcColumna(input: ColumnaInput): ColumnaResult {
     acero_total_kg: aceroTot,
     vertical: detV,
     estribos: detS,
+    warnings,
+    assumptions,
+    fuente_id: "guia_obras_vivienda"
   };
 }
 

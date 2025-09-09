@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "descripcion": "Valores guía simplificados para chequeos mínimos NO normativos.",
+  "hormigon": {
+    "recubrimiento_mm_sugerido": {
+      "interior_seco": 20,
+      "exterior": 25
+    },
+    "separacion_min_estribos_mm": 80,
+    "cuantia_min_flexion_por_mil": 2.0
+  },
+  "losa": {
+    "relacion_L_sobre_t_limite_vivienda": 40,
+    "relacion_L_sobre_t_limite_comercial_liviano": 35,
+    "espesor_min_cm": 10
+  },
+  "columna": {
+    "lado_min_vivienda_cm": 20,
+    "esbeltez_advertencia": 15,
+    "esbeltez_peligro": 20
+  },
+  "viga": {
+    "relacion_L_sobre_h_advertencia": 16,
+    "relacion_L_sobre_h_peligro": 18,
+    "b_sobre_h_min_recomendado": 0.35
+  }
+}

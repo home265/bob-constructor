@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "items": [
+    {
+      "id": "guia_obras_vivienda",
+      "titulo": "Guía de prácticas usuales de obra en vivienda",
+      "editor": "Compendio local",
+      "edicion": "2024",
+      "nota": "Valores orientativos recabados de manuales y práctica corriente en Argentina."
+    }
+  ]
+}

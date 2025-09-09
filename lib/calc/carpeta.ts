@@ -1,5 +1,16 @@
 import { round2 } from "./rc";
 
+export type MixMapArrayItem = { carpeta_id?: string; mortero_id?: string; id?: string };
+export type MixMapArray = MixMapArrayItem[];
+export type MixMapObject = Record<string, { mortero_id?: string | number } | string | number>;
+export type MixMap = MixMapArray | MixMapObject;
+
+export interface MorteroFicha {
+  per_m3?: Record<string, number>;
+  per_m2cm?: Record<string, number>;
+  [k: string]: unknown; // permite campos extra sin romper tipos
+}
+
 export type CarpetaInput = {
   tipo: string;            // ej "1_3"
   hidro?: string;          // "si" | "no" (opcional por ahora)
@@ -7,8 +18,8 @@ export type CarpetaInput = {
   A: number;               // m
   Hcm: number;             // cm
   wastePct?: number;       // %
-  mixMap?: any;            // array de { carpeta_id, mortero_id } o similar
-  morteros?: Record<string, any>; // diccionario mortero_id -> ficha de mortero
+  mixMap?: MixMap;         // array u objeto de mapeo carpeta->mortero
+  morteros?: Record<string, MorteroFicha>; // diccionario mortero_id -> ficha de mortero
 };
 
 export type CarpetaResult = {
@@ -21,16 +32,20 @@ export type CarpetaResult = {
   modo: "per_m3" | "per_m2cm" | "simple";
 };
 
-function findMorteroId(tipo: string, mixMap: any): string | undefined {
+function findMorteroId(tipo: string, mixMap?: MixMap): string | undefined {
   if (!mixMap) return;
   // si es ARRAY: { carpeta_id, mortero_id }
   if (Array.isArray(mixMap)) {
     const hit = mixMap.find((r) => r?.carpeta_id === tipo || r?.id === tipo);
-    return hit?.mortero_id;
+    const mid = hit?.mortero_id;
+    return typeof mid === "number" || typeof mid === "string" ? String(mid) : undefined;
   }
   // si es OBJ key->value
-  if (typeof mixMap === "object") {
-    return mixMap[tipo]?.mortero_id ?? mixMap[tipo];
+  if (typeof mixMap === "object" && mixMap !== null) {
+    const val = (mixMap as MixMapObject)[tipo];
+    if (typeof val === "string" || typeof val === "number") return String(val);
+    const mid = (val as { mortero_id?: string | number } | undefined)?.mortero_id;
+    return typeof mid === "number" || typeof mid === "string" ? String(mid) : undefined;
   }
   return;
 }
@@ -57,15 +72,15 @@ export function calcCarpeta(input: CarpetaInput): CarpetaResult {
     const porM2cm = ficha?.per_m2cm;
 
     if (porM3 && typeof porM3 === "object") {
-      for (const [k, v] of Object.entries(porM3)) {
+      for (const [k, v] of Object.entries(porM3 as Record<string, number>)) {
         if (typeof v === "number" && isFinite(v)) {
           materiales[k] = round2(v * volW);
         }
       }
       modo = "per_m3";
     } else if (porM2cm && typeof porM2cm === "object") {
-      const factor = area * (Math.max(0, Hcm)) * fWaste; // m2*cm
-      for (const [k, v] of Object.entries(porM2cm)) {
+      const factor = area * Math.max(0, Hcm) * fWaste; // m2*cm
+      for (const [k, v] of Object.entries(porM2cm as Record<string, number>)) {
         if (typeof v === "number" && isFinite(v)) {
           materiales[k] = round2(v * factor);
         }

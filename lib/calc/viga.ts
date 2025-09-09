@@ -1,5 +1,7 @@
 // lib/calc/viga.ts
 import { round2, stirrupLengthRect, stirrupQty } from "@/lib/calc/rc";
+import { checkBeamBasics, BeamCheckInput } from "@/lib/checks/struct_basics";
+import { CheckMessage } from "@/lib/checks/messages";
 
 // --- Tipos
 export type VigaInput = {
@@ -30,6 +32,9 @@ export type VigaInput = {
     spacing_cm?: number;
     hook_cm?: number;   // ganchos (cm), por defecto 10 cm
   };
+
+  // Contexto (opcional) para chequeos básicos
+  floors_supported?: number; // cantidad de pisos que carga (aprox)
 };
 
 export type VigaResult = {
@@ -72,6 +77,11 @@ export type VigaResult = {
     regla_as_min: string;
     combos_longitudinal: Array<{ phi_mm: number; cantidad: number; As_cm2: number }>;
   };
+
+  // --- Nuevo: chequeos y metadatos (opcionales)
+  warnings?: CheckMessage[];
+  assumptions?: string[];
+  fuente_id?: string;
 };
 
 // --- Helpers internos
@@ -131,6 +141,7 @@ export function calcViga(input: VigaInput): VigaResult {
     rebarTable = {},
     long,
     stirrups,
+    floors_supported
   } = input;
 
   const L = Math.max(0, safeN(L_m));
@@ -212,6 +223,22 @@ export function calcViga(input: VigaInput): VigaResult {
 
   const aceroTot = round2(kgLong + kgSt);
 
+  // --- Chequeos básicos (no normativos), en lenguaje de obra
+  const checkInput: BeamCheckInput = {
+    span_m: L,
+    section_b_cm: b_cm,
+    section_h_cm: h_cm,
+    floors_supported: floors_supported ?? 1
+  };
+  const warnings: CheckMessage[] = checkBeamBasics(checkInput);
+
+  // --- Supuestos (visibles en memoria)
+  const assumptions: string[] = [
+    "h≈L/12; b≈h/2 como guía de proporciones.",
+    "As,min ≈ 0,20% · b · h como referencia mínima de armadura.",
+    `Desperdicio aplicado: ${round2(Math.max(0, safeN(wastePct)))}%.`
+  ];
+
   return {
     dimensiones: { L_m: round2(L), b_cm: round2(b_cm), h_cm: round2(h_cm), cover_cm: round2(cover_cm) },
     area_seccion_m2: round2(area),
@@ -229,6 +256,9 @@ export function calcViga(input: VigaInput): VigaResult {
       regla_as_min: "As,min ≈ 0,20% · b · h",
       combos_longitudinal: combosSug,
     },
+    warnings,
+    assumptions,
+    fuente_id: "guia_obras_vivienda"
   };
 }
 

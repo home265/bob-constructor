@@ -5,6 +5,20 @@ import { useParams, useRouter } from "next/navigation";
 import { getProject } from "@/lib/project/storage";
 import { aggregateMaterials } from "@/lib/project/compute";
 import type { Project as DBProject } from "@/lib/db";
+// 🔹 Nuevo: vista previa de Memoria
+import MemoryPreview from "@/components/ui/MemoryPreview";
+import type { MemoryReport } from "@/lib/report/memoria";
+
+function isMemoryReport(x: unknown): x is MemoryReport {
+  if (typeof x !== "object" || x === null) return false;
+  const rec = x as Record<string, unknown>;
+  const entradas = rec["entradas"];
+  return (
+    typeof rec["proyecto"] === "string" &&
+    typeof rec["fechaISO"] === "string" &&
+    Array.isArray(entradas)
+  );
+}
 
 export default function ProyectoExportPage() {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +26,9 @@ export default function ProyectoExportPage() {
 
   const [project, setProject] = useState<DBProject | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 🔹 Nuevo: estado para Memoria
+  const [memoryReport, setMemoryReport] = useState<MemoryReport | null>(null);
 
   // Carga inicial
   useEffect(() => {
@@ -25,6 +42,20 @@ export default function ProyectoExportPage() {
       setLoading(false);
     })();
   }, [id, router]);
+
+  // 🔹 Carga Memoria (si existe) desde localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("memoria:current");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as unknown;
+      if (isMemoryReport(parsed)) {
+        setMemoryReport(parsed);
+      }
+    } catch {
+      // silencio: si no existe o está corrupto, no mostramos memoria
+    }
+  }, []);
 
   const mat = useMemo(() => (project ? aggregateMaterials(project) : []), [project]);
   const date = new Date().toLocaleDateString("es-AR", {
@@ -145,6 +176,20 @@ export default function ProyectoExportPage() {
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      {/* 🔹 Memoria de Cálculo (si hay entradas guardadas) */}
+      <section>
+        <h2 className="section-title">Memoria de Cálculo</h2>
+        {memoryReport && memoryReport.entradas.length > 0 ? (
+          <div className="mt-3">
+            <MemoryPreview report={memoryReport} autor="Bob Constructor" />
+          </div>
+        ) : (
+          <div className="project-details">
+            No hay entradas guardadas en la memoria. Podés añadirlas desde las pantallas de cálculo.
+          </div>
         )}
       </section>
 

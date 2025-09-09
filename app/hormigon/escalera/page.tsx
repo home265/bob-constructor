@@ -1,6 +1,6 @@
 // app/hormigon/escalera/page.tsx
 "use client";
-import { useMemo, useState, useEffect, Suspense } from "react";
+import { useMemo, useState, Suspense } from "react";
 import { useJson } from "@/lib/data/useJson";
 import * as C from "@/lib/calc/escalera";
 import ResultTable, { ResultRow } from "@/components/ui/ResultTable";
@@ -14,7 +14,60 @@ import { toUnit } from "@/lib/project/helpers";
 import { keyToLabel, keyToUnit } from "@/components/ui/result-mappers";
 import NumberWithUnit from "@/components/inputs/NumberWithUnit";
 
-// (Aquí irían los tipos de ConcreteRow y RebarRow, si los necesitas)
+// Tipos para datos de materiales (concreto y acero)
+type ConcreteRow = {
+  id?: string;
+  label?: string;
+};
+
+type RebarRow = {
+  id?: string;
+  phi_mm?: number;
+  kg_m?: number;
+  label?: string;
+};
+
+// Tipos para el cálculo (entrada/salida mínimamente necesarios)
+type EscaleraCalcInput = {
+  tipo: "recta" | "L" | "U";
+  alturaTotal_m: number;
+  tramos: C.TramoInput[];
+  espesorLosa_cm: number;
+  incluirDescanso: boolean;
+  anchoDescanso_m: number;
+  concreteClassId: string;
+  wastePct: number;
+  rebarTable: Record<string, { kg_m?: number; label?: string }>;
+  aceroPrincipal: { phi_mm: number; separacion_cm: number };
+  aceroReparticion: { phi_mm: number; separacion_cm: number };
+};
+
+type EscaleraResult = {
+  leyBlondel_cm: number;
+  cantidadEscalones: number;
+  alzada_cm: number;
+  pedada_cm: number;
+  anguloInclinacion_grados: number;
+
+  volumenHormigonTotal_m3: number;
+  aceroTotal_kg: number;
+  superficieEncofrado_m2: number;
+};
+
+// Fallback tipado (se usa sólo si el módulo no exporta calcEscalera/default)
+const fallbackCalc = (x: EscaleraCalcInput): EscaleraResult => {
+  // Valores neutros para no romper la UI si faltara la función real
+  return {
+    leyBlondel_cm: 0,
+    cantidadEscalones: 0,
+    alzada_cm: 0,
+    pedada_cm: 0,
+    anguloInclinacion_grados: 0,
+    volumenHormigonTotal_m3: 0,
+    aceroTotal_kg: 0,
+    superficieEncofrado_m2: 0,
+  };
+};
 
 function EscaleraCalculator() {
   const [tipo, setTipo] = useState<"recta" | "L" | "U">("recta");
@@ -31,25 +84,61 @@ function EscaleraCalculator() {
   const [phiR, setPhiR] = useState(8);
   const [sepR, setSepR] = useState(20);
 
-  const concrete = useJson<any>("/data/concrete_classes.json", {});
-  const rebars = useJson<any>("/data/rebar_diams.json", {});
-  const concreteOpts = useMemo(() => Object.values(concrete).map((r: any) => ({ key: r.id, label: r.label ?? r.id })), [concrete]);
-  const rebarOpts = useMemo(() => Object.values(rebars).sort((a: any, b: any) => a.phi_mm - b.phi_mm).map((r: any) => ({ key: String(r.phi_mm), label: r.label ?? `Φ${r.phi_mm}`, phi_mm: r.phi_mm, kg_m: r.kg_m })), [rebars]);
-  const rebarMap = useMemo(() => { const m: Record<string, any> = {}; rebarOpts.forEach(r => { m[r.key] = { kg_m: r.kg_m } }); return m; }, [rebarOpts]);
+  // Datos desde JSON, tipados
+  const concrete = useJson<Record<string, ConcreteRow>>("/data/concrete_classes.json", {});
+  const rebars = useJson<Record<string, RebarRow>>("/data/rebar_diams.json", {});
+
+  const concreteOpts = useMemo(
+    () =>
+      Object.values(concrete ?? {}).map((r, i) => ({
+        key: r?.id ?? `c${i}`,
+        label: r?.label ?? r?.id ?? `Clase ${i + 1}`,
+      })),
+    [concrete]
+  );
+
+  const rebarOpts = useMemo(() => {
+    const rows = Object.values(rebars ?? {});
+    rows.sort((a, b) => (a?.phi_mm ?? 0) - (b?.phi_mm ?? 0));
+    return rows.map((r, i) => ({
+      key: String(r?.phi_mm ?? r?.id ?? i),
+      label: r?.label ?? `Φ${r?.phi_mm ?? r?.id}`,
+      phi_mm: r?.phi_mm ?? Number(r?.id) ?? 0,
+      kg_m: r?.kg_m ?? 0,
+    }));
+  }, [rebars]);
+
+  const rebarMap = useMemo(() => {
+    const m: Record<string, { kg_m?: number; label?: string }> = {};
+    rebarOpts.forEach((r) => (m[r.key] = { kg_m: r.kg_m, label: r.label }));
+    return m;
+  }, [rebarOpts]);
 
   const tramos: C.TramoInput[] = useMemo(() => {
-    if (tipo === 'recta') return [{ largoHorizontal_m: largoT1, ancho_m: ancho }];
-    if (tipo === 'L') return [{ largoHorizontal_m: largoT1, ancho_m: ancho }]; // El descanso se calcula aparte
-    if (tipo === 'U') return [{ largoHorizontal_m: largoT1, ancho_m: ancho }, { largoHorizontal_m: largoT2, ancho_m: ancho }];
+    if (tipo === "recta") return [{ largoHorizontal_m: largoT1, ancho_m: ancho }];
+    if (tipo === "L") return [{ largoHorizontal_m: largoT1, ancho_m: ancho }]; // El descanso se calcula aparte
+    if (tipo === "U")
+      return [
+        { largoHorizontal_m: largoT1, ancho_m: ancho },
+        { largoHorizontal_m: largoT2, ancho_m: ancho },
+      ];
     return [];
   }, [tipo, largoT1, largoT2, ancho]);
 
-  const res = C.calcEscalera({
+  // Resolver función de cálculo con fallback tipado
+  const mod = C as {
+    calcEscalera?: (x: EscaleraCalcInput) => EscaleraResult;
+    default?: (x: EscaleraCalcInput) => EscaleraResult;
+  };
+  const calc: (x: EscaleraCalcInput) => EscaleraResult =
+    mod.calcEscalera ?? mod.default ?? fallbackCalc;
+
+  const res = calc({
     tipo,
     alturaTotal_m: altura,
     tramos,
     espesorLosa_cm: espesorLosa,
-    incluirDescanso: tipo !== 'recta',
+    incluirDescanso: tipo !== "recta",
     anchoDescanso_m: anchoDescanso,
     concreteClassId: concreteId,
     wastePct: waste,
@@ -62,20 +151,42 @@ function EscaleraCalculator() {
     const r: ResultRow[] = [];
     const items: MaterialRow[] = [];
 
-    r.push({ label: "Diseño (Ley de Blondel)", qty: `${res.leyBlondel_cm} cm`, hint: (res.leyBlondel_cm >= 62 && res.leyBlondel_cm <= 65) ? "Óptimo" : "Revisar diseño" });
+    r.push({
+      label: "Diseño (Ley de Blondel)",
+      qty: `${res.leyBlondel_cm} cm`,
+      hint:
+        res.leyBlondel_cm >= 62 && res.leyBlondel_cm <= 65
+          ? "Óptimo"
+          : "Revisar diseño",
+    });
     r.push({ label: "Cantidad de Escalones", qty: res.cantidadEscalones, unit: "un." });
     r.push({ label: "Alzada (contrahuella)", qty: res.alzada_cm, unit: "cm" });
     r.push({ label: "Pedada (huella)", qty: res.pedada_cm, unit: "cm" });
     r.push({ label: "Ángulo de Inclinación", qty: res.anguloInclinacion_grados, unit: "°" });
-    
+
     r.push({ label: "Hormigón Total", qty: res.volumenHormigonTotal_m3, unit: "m³" });
-    items.push({key: 'hormigon_escalera_m3', label: `Hormigón para Escalera (${concreteId})`, qty: res.volumenHormigonTotal_m3, unit: 'm3'});
-    
+    items.push({
+      key: "hormigon_escalera_m3",
+      label: `Hormigón para Escalera (${concreteId})`,
+      qty: res.volumenHormigonTotal_m3,
+      unit: "m3",
+    });
+
     r.push({ label: "Acero Total", qty: res.aceroTotal_kg, unit: "kg" });
-    items.push({key: 'acero_escalera_kg', label: 'Acero para Escalera', qty: res.aceroTotal_kg, unit: 'kg'});
+    items.push({
+      key: "acero_escalera_kg",
+      label: "Acero para Escalera",
+      qty: res.aceroTotal_kg,
+      unit: "kg",
+    });
 
     r.push({ label: "Superficie de Encofrado", qty: res.superficieEncofrado_m2, unit: "m²" });
-    items.push({key: 'encofrado_escalera_m2', label: 'Encofrado para Escalera', qty: res.superficieEncofrado_m2, unit: 'm2'});
+    items.push({
+      key: "encofrado_escalera_m2",
+      label: "Encofrado para Escalera",
+      qty: res.superficieEncofrado_m2,
+      unit: "m2",
+    });
 
     const title = `Escalera de ${res.cantidadEscalones} escalones (${tipo})`;
 
@@ -90,22 +201,180 @@ function EscaleraCalculator() {
           {/* Geometría y Tipo */}
           <h3 className="font-medium border-b pb-2">Geometría de la Escalera</h3>
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm col-span-2"><span className="flex items-center">Forma de la Escalera<HelpPopover>Elige la forma. "L" tiene un tramo y un descanso. "U" tiene dos tramos y un descanso.</HelpPopover></span><select value={tipo} onChange={e => setTipo(e.target.value as any)} className="w-full px-3 py-2"><option value="recta">Recta (un tramo)</option><option value="L">En L (un tramo + descanso)</option><option value="U">En U (dos tramos + descanso)</option></select></label>
-            <NumberWithUnit label={<span className="flex items-center">Altura a Salvar<HelpPopover>Altura total de piso terminado a piso terminado que debe cubrir la escalera.</HelpPopover></span>} name="altura" unit="m" value={altura} onChange={setAltura} />
-            <NumberWithUnit label={<span className="flex items-center">Ancho de Tramos<HelpPopover>Ancho libre de los escalones.</HelpPopover></span>} name="ancho" unit="m" value={ancho} onChange={setAncho} />
-            <NumberWithUnit label={<span className="flex items-center">Largo Horizontal (Tramo 1)<HelpPopover>Longitud horizontal que ocupa el primer tramo de la escalera.</HelpPopover></span>} name="largoT1" unit="m" value={largoT1} onChange={setLargoT1} />
-            {tipo === 'U' && <NumberWithUnit label={<span className="flex items-center">Largo Horizontal (Tramo 2)<HelpPopover>Longitud horizontal que ocupa el segundo tramo de la escalera.</HelpPopover></span>} name="largoT2" unit="m" value={largoT2} onChange={setLargoT2} />}
-            {tipo === 'U' && <NumberWithUnit label={<span className="flex items-center">Ancho Descanso<HelpPopover>Ancho del descanso que une los dos tramos.</HelpPopover></span>} name="anchoDescanso" unit="m" value={anchoDescanso} onChange={setAnchoDescanso} />}
+            <label className="text-sm col-span-2">
+              <span className="flex items-center">
+                Forma de la Escalera
+                <HelpPopover>
+                  Elige la forma. "L" tiene un tramo y un descanso. "U" tiene dos tramos y un descanso.
+                </HelpPopover>
+              </span>
+              <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as "recta" | "L" | "U")}
+                className="w-full px-3 py-2"
+              >
+                <option value="recta">Recta (un tramo)</option>
+                <option value="L">En L (un tramo + descanso)</option>
+                <option value="U">En U (dos tramos + descanso)</option>
+              </select>
+            </label>
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Altura a Salvar
+                  <HelpPopover>
+                    Altura total de piso terminado a piso terminado que debe cubrir la escalera.
+                  </HelpPopover>
+                </span>
+              }
+              name="altura"
+              unit="m"
+              value={altura}
+              onChange={setAltura}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Ancho de Tramos
+                  <HelpPopover>Ancho libre de los escalones.</HelpPopover>
+                </span>
+              }
+              name="ancho"
+              unit="m"
+              value={ancho}
+              onChange={setAncho}
+            />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Largo Horizontal (Tramo 1)
+                  <HelpPopover>
+                    Longitud horizontal que ocupa el primer tramo de la escalera.
+                  </HelpPopover>
+                </span>
+              }
+              name="largoT1"
+              unit="m"
+              value={largoT1}
+              onChange={setLargoT1}
+            />
+            {tipo === "U" && (
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Largo Horizontal (Tramo 2)
+                    <HelpPopover>
+                      Longitud horizontal que ocupa el segundo tramo de la escalera.
+                    </HelpPopover>
+                  </span>
+                }
+                name="largoT2"
+                unit="m"
+                value={largoT2}
+                onChange={setLargoT2}
+              />
+            )}
+            {tipo === "U" && (
+              <NumberWithUnit
+                label={
+                  <span className="flex items-center">
+                    Ancho Descanso
+                    <HelpPopover>
+                      Ancho del descanso que une los dos tramos.
+                    </HelpPopover>
+                  </span>
+                }
+                name="anchoDescanso"
+                unit="m"
+                value={anchoDescanso}
+                onChange={setAnchoDescanso}
+              />
+            )}
           </div>
           {/* Materiales */}
           <h3 className="font-medium border-b pb-2">Materiales y Armado</h3>
           <div className="grid grid-cols-2 gap-3">
-            <NumberWithUnit label={<span className="flex items-center">Espesor Losa Inclinada<HelpPopover>También llamada "garganta". Es el espesor de hormigón debajo de los escalones. Típico: 10-15 cm.</HelpPopover></span>} name="espesor_losa" unit="cm" value={espesorLosa} onChange={setEspesorLosa} />
-            <label className="text-sm"><span className="flex items-center">Hormigón<HelpPopover>Resistencia del hormigón. H-21 es común para escaleras.</HelpPopover></span><select value={concreteId} onChange={e => setConcreteId(e.target.value)} className="w-full px-3 py-2">{concreteOpts.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></label>
-            <label className="text-sm"><span className="flex items-center">Φ Acero Principal<HelpPopover>Diámetro del acero que va en la dirección larga de los tramos.</HelpPopover></span><select value={phiP} onChange={e => setPhiP(Number(e.target.value))} className="w-full px-3 py-2">{rebarOpts.map(r => <option key={`p-${r.key}`} value={r.phi_mm}>{r.label}</option>)}</select></label>
-            <NumberWithUnit label="Separación Acero Principal" name="sep_p" unit="cm" value={sepP} onChange={setSepP} />
-            <label className="text-sm"><span className="flex items-center">Φ Acero Repartición<HelpPopover>Diámetro del acero transversal, perpendicular al principal.</HelpPopover></span><select value={phiR} onChange={e => setPhiR(Number(e.target.value))} className="w-full px-3 py-2">{rebarOpts.map(r => <option key={`r-${r.key}`} value={r.phi_mm}>{r.label}</option>)}</select></label>
-            <NumberWithUnit label="Separación Acero Repartición" name="sep_r" unit="cm" value={sepR} onChange={setSepR} />
+            <NumberWithUnit
+              label={
+                <span className="flex items-center">
+                  Espesor Losa Inclinada
+                  <HelpPopover>
+                    También llamada "garganta". Es el espesor de hormigón debajo de los escalones. Típico: 10-15 cm.
+                  </HelpPopover>
+                </span>
+              }
+              name="espesor_losa"
+              unit="cm"
+              value={espesorLosa}
+              onChange={setEspesorLosa}
+            />
+            <label className="text-sm">
+              <span className="flex items-center">
+                Hormigón
+                <HelpPopover>Resistencia del hormigón. H-21 es común para escaleras.</HelpPopover>
+              </span>
+              <select
+                value={concreteId}
+                onChange={(e) => setConcreteId(e.target.value)}
+                className="w-full px-3 py-2"
+              >
+                {concreteOpts.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="flex items-center">
+                Φ Acero Principal
+                <HelpPopover>Diámetro del acero que va en la dirección larga de los tramos.</HelpPopover>
+              </span>
+              <select
+                value={phiP}
+                onChange={(e) => setPhiP(Number(e.target.value))}
+                className="w-full px-3 py-2"
+              >
+                {rebarOpts.map((r) => (
+                  <option key={`p-${r.key}`} value={r.phi_mm}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <NumberWithUnit
+              label="Separación Acero Principal"
+              name="sep_p"
+              unit="cm"
+              value={sepP}
+              onChange={setSepP}
+            />
+            <label className="text-sm">
+              <span className="flex items-center">
+                Φ Acero Repartición
+                <HelpPopover>
+                  Diámetro del acero transversal, perpendicular al principal.
+                </HelpPopover>
+              </span>
+              <select
+                value={phiR}
+                onChange={(e) => setPhiR(Number(e.target.value))}
+                className="w-full px-3 py-2"
+              >
+                {rebarOpts.map((r) => (
+                  <option key={`r-${r.key}`} value={r.phi_mm}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <NumberWithUnit
+              label="Separación Acero Repartición"
+              name="sep_r"
+              unit="cm"
+              value={sepR}
+              onChange={setSepR}
+            />
           </div>
         </div>
         <div className="card p-4 card--table">
@@ -121,5 +390,9 @@ function EscaleraCalculator() {
 }
 
 export default function EscaleraPage() {
-  return (<Suspense fallback={<div>Cargando...</div>}><EscaleraCalculator /></Suspense>);
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <EscaleraCalculator />
+    </Suspense>
+  );
 }

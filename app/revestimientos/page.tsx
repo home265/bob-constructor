@@ -1,3 +1,4 @@
+// app/revestimientos/page.tsx
 "use client";
 import { useMemo, useState, useEffect, Suspense } from "react";
 import { useJson } from "@/lib/data/useJson";
@@ -22,13 +23,13 @@ type RevestOptionsFile = {
   juntas_mm?: number[];
 };
 
-type Coeffs = Record<string, any>;
-type Pastina = Record<string, any>;
-type Adhesivos = Record<string, any>;
+type Coeffs = C.RevestCoeffs;
+type Pastina = C.PastinaCoeffs | Record<string, unknown>;
+type Adhesivos = Record<string, unknown>;
 
 // ------- helper Unit (evita errores de tipos) -------
-function normalizeUnit(u: string): Unit {
-  const s = (u || "").toLowerCase();
+function normalizeUnit(u: string | Unit): Unit {
+  const s = String(u || "").toLowerCase();
   if (s === "m²" || s === "m2") return "m2";
   if (s === "m³" || s === "m3") return "m3";
   if (s === "kg") return "kg";
@@ -39,17 +40,21 @@ function normalizeUnit(u: string): Unit {
 }
 
 // ------- pequeño lector robusto de coeficientes -------
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
 function pickNumber(
-  obj: any,
+  obj: unknown,
   paths: (string | number)[][]
 ): number | undefined {
-  if (!obj || typeof obj !== "object") return undefined;
+  if (!isRecord(obj)) return undefined;
   for (const p of paths) {
-    let cur: any = obj;
+    let cur: unknown = obj;
     let ok = true;
     for (const k of p) {
-      if (cur && typeof cur === "object" && k in cur) {
-        cur = (cur as any)[k as any];
+      if (isRecord(cur) && Object.prototype.hasOwnProperty.call(cur, String(k))) {
+        cur = (cur as Record<string, unknown>)[String(k)];
       } else {
         ok = false;
         break;
@@ -74,7 +79,7 @@ type BatchItem = {
     junta: number; // mm
     waste: number; // %
   };
-  outputs: Record<string, any>;
+  outputs: Record<string, unknown>;
 };
 
 function RevestimientosCalculator() {
@@ -138,7 +143,7 @@ function RevestimientosCalculator() {
     (async () => {
       const p = await getPartida(projectId, partidaId);
       if (p?.inputs) {
-        const inp = p.inputs as any;
+        const inp = p.inputs as Record<string, unknown>;
         if (typeof inp.tipo === "string") setTipo(inp.tipo);
         if (typeof inp.L === "number") setLx(inp.L);
         if (typeof inp.A === "number") setLy(inp.A);
@@ -150,9 +155,29 @@ function RevestimientosCalculator() {
     })();
   }, [projectId, partidaId]);
 
-  // Cálculo (usa tu función real si existe; si no, eco del input)
-  // @ts-ignore
-  const calc = C.calcRevestimientos ?? C.default ?? ((x: any) => x);
+  // Cálculo (usa tu función real si existe; si no, eco razonable del input)
+  type CalcFn = (x: C.RevestInput) => C.RevestResult;
+  const mod = C as { calcRevestimientos?: CalcFn; default?: CalcFn };
+  const calc: CalcFn =
+    mod.calcRevestimientos ??
+    mod.default ??
+    ((x: C.RevestInput) => {
+      const area = Math.max(0, x.L) * Math.max(0, x.A);
+      const j_cm = Math.max(0, x.junta_mm) / 10;
+      const modL_m = (Math.max(0, x.pieza_cm.LP) + j_cm) / 100;
+      const modA_m = (Math.max(0, x.pieza_cm.AP) + j_cm) / 100;
+      const modulo_m2 = modL_m * modA_m || 0.000001;
+      const piezas = Math.ceil(area / modulo_m2);
+      const piezasW = Math.ceil(piezas * (1 + (x.wastePct ?? 0) / 100));
+      return {
+        materiales: {},
+        area_m2: Math.round(area * 100) / 100,
+        modulo_m2: Math.round(modulo_m2 * 100) / 100,
+        piezas_necesarias: piezas,
+        piezas_con_desperdicio: piezasW,
+      };
+    });
+
   const res = calc({
     tipo,
     L: Lx,
@@ -161,7 +186,7 @@ function RevestimientosCalculator() {
     junta_mm: junta,
     wastePct: waste,
     coeffs,
-    pastina,
+    pastina: pastina as C.PastinaCoeffs,
   });
 
   // --------- (B) Materiales completos (pastina + adhesivo) ----------
@@ -260,7 +285,7 @@ function RevestimientosCalculator() {
       });
     }
 
-    return list.map((m) => ({ ...m, unit: normalizeUnit(m.unit as unknown as string) }));
+    return list.map((m) => ({ ...m, unit: normalizeUnit(m.unit) }));
   }, [res?.cajas, res?.piezas_con_desperdicio, matAcum.pastina_kg, matAcum.adhesivo_kg]);
 
   const defaultTitle = `Revestimiento ${Lx}×${Ly} m · pieza ${lp}×${ap} cm · junta ${junta} mm`;
@@ -275,7 +300,7 @@ function RevestimientosCalculator() {
       title: defaultTitle,
       materials: itemsForProject,
       inputs: { tipo, L: Lx, A: Ly, lp, ap, junta, waste },
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
     };
     setBatch((prev) => {
       if (editIndex !== null) {
@@ -312,7 +337,7 @@ function RevestimientosCalculator() {
     await updatePartida(projectId, partidaId, {
       title: defaultTitle,
       inputs: { tipo, L: Lx, A: Ly, lp, ap, junta, waste },
-      outputs: res as any,
+      outputs: res as unknown as Record<string, unknown>,
       materials: itemsForProject,
     });
     alert("Partida actualizada.");
